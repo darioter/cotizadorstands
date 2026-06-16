@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stand Estimator · DALI Arquitectura 360°</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --accent: #B85C38;
+    --navy: #1B2A3B;
+    --cream: #F7F3EE;
+    --gold: #C9963A;
+    --green: #2E7D52;
+    --border: #E8DDD4;
+    --muted: #888;
+    --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--cream); color: #1a1a1a; min-height: 100vh; }
+
+  /* ── Auth ── */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .auth-box { background: #fff; border-radius: 16px; border: 1px solid var(--border); padding: 40px 36px; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(27,42,59,.10); text-align: center; }
+  .auth-logo { background: var(--accent); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 18px; }
+  .auth-title { font-family: 'Georgia', serif; font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .auth-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .auth-tabs { display: flex; gap: 4px; background: #F0EAE2; border-radius: 8px; padding: 3px; margin-bottom: 20px; }
+  .auth-tab { flex: 1; border: none; border-radius: 6px; padding: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; background: transparent; color: var(--muted); }
+  .auth-tab.active { background: #fff; color: var(--navy); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+  /* ── Layout ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+  header { background: var(--navy); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { background: var(--accent); width: 34px; height: 34px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .logo-text { color: #fff; font-weight: 700; font-size: 14px; font-family: 'Georgia', serif; }
+  .logo-sub { color: #A0B4C8; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+  nav { display: flex; gap: 3px; background: rgba(255,255,255,.08); border-radius: 8px; padding: 3px; }
+  nav button { border: none; border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; background: transparent; color: #A0B4C8; }
+  nav button.active { background: #fff; color: var(--navy); }
+  .user-area { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .user-name { color: #fff; font-size: 12px; }
+
+  main { flex: 1; max-width: 960px; margin: 0 auto; padding: 24px 18px; width: 100%; }
+
+  /* ── Cards / Panels ── */
+  .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 2px 12px rgba(27,42,59,.06); margin-bottom: 16px; }
+  .card-header { background: #F7F3EE; padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .card-header h2 { font-family: 'Georgia', serif; font-size: 16px; color: var(--navy); margin: 0; }
+  .card-header h3 { font-family: 'Georgia', serif; font-size: 14px; color: var(--navy); margin: 0; }
+  .card-body { padding: 18px 20px; }
+
+  /* ── Forms ── */
+  label.field-label { display: block; font-size: 11px; font-weight: 700; color: #555; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 6px; }
+  input, textarea, select { font-family: inherit; font-size: 13px; color: var(--navy); background: #FDFAF7; border: 1.5px solid #DDD4C8; border-radius: 7px; padding: 9px 12px; outline: none; transition: border-color .15s; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; width: 100%; }
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  /* ── Buttons ── */
+  .btn { border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 7px; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: .88; }
+  .btn-secondary { background: #F0EAE2; color: var(--navy); }
+  .btn-secondary:hover { background: #E8DDD4; }
+  .btn-gold { background: var(--gold); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-danger { background: #FFF0EE; color: #C0392B; border: 1px solid #F8C5BC; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-full { width: 100%; justify-content: center; padding: 13px; font-size: 14px; }
+
+  /* ── Badge ── */
+  .badge { display: inline-flex; align-items: center; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+  .badge-accent { background: var(--accent); color: #fff; }
+  .badge-gold { background: var(--gold); color: #fff; }
+  .badge-green { background: #E8F5EE; color: var(--green); }
+  .badge-muted { background: #F0EAE2; color: #666; }
+  .badge-red { background: #FFF0EE; color: #C0392B; }
+  .badge-up { background: #FFF0EE; color: #C0392B; }
+  .badge-down { background: #E8F5EE; color: var(--green); }
+  .badge-new { background: #FFFBF0; color: #7A5C1E; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 3px; background: #EDE5DC; border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+  .tab { flex: 1; border: none; border-radius: 7px; padding: 8px 10px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; background: transparent; color: var(--muted); font-family: inherit; }
+  .tab.active { background: #fff; color: var(--navy); box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+
+  /* ── DropZone ── */
+  .dropzone { border: 2px dashed #C4B8AD; border-radius: 9px; padding: 16px 12px; cursor: pointer; background: #FDFAF7; transition: all .2s; text-align: center; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .dropzone:hover, .dropzone.over { border-color: var(--accent); background: #FFF3EC; }
+  .dropzone.has-file { border-color: var(--gold); background: #FFF9F0; }
+  .dropzone-icon { font-size: 22px; }
+  .dropzone-label { font-weight: 600; color: var(--navy); font-size: 12px; }
+  .dropzone-sub { font-size: 10px; color: #999; }
+  .dropzone-name { font-weight: 700; color: var(--navy); font-size: 12px; }
+  .dropzone-size { font-size: 10px; color: #888; }
+
+  /* ── Rubros table ── */
+  .rubros-grid { display: grid; grid-template-columns: 30px 1fr 150px 80px 1fr 28px; gap: 7px; align-items: center; }
+  .rubros-header { font-size: 10px; font-weight: 700; color: #999; letter-spacing: .07em; text-transform: uppercase; padding: 8px 0 6px; border-bottom: 1px solid #F0EAE2; }
+  .rubro-row { padding: 7px 0; border-bottom: 1px solid #FAF5F0; }
+  .rubro-input { border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; font-size: 12px; color: var(--navy); outline: none; background: transparent; width: 100%; transition: border-color .15s; }
+  .rubro-input:focus { border-color: #DDD4C8; background: #FDFAF7; }
+  .rubro-small { border: 1px solid var(--border); border-radius: 5px; padding: 4px 7px; font-size: 12px; color: #555; outline: none; width: 100%; background: #FDFAF7; }
+  .rubro-num { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px; font-size: 13px; font-weight: 700; color: var(--navy); outline: none; width: 100%; text-align: right; background: #FDFAF7; }
+  .del-btn { background: none; border: none; cursor: pointer; color: #CCC; font-size: 16px; padding: 0; line-height: 1; transition: color .15s; }
+  .del-btn:hover { color: #C0392B; }
+
+  /* ── Summary bar ── */
+  .summary-bar { background: var(--navy); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
+  .summary-stat { text-align: center; }
+  .summary-stat-label { color: #A0B4C8; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  .summary-stat-value { color: #fff; font-weight: 700; font-size: 18px; }
+  .summary-stat-value.gold { color: var(--gold); }
+
+  /* ── Desglose row ── */
+  .desglose-row { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid #F7F3EE; }
+  .desglose-pct { width: 38px; height: 38px; border-radius: 7px; background: rgba(184,92,56,.10); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; color: var(--accent); font-size: 12px; }
+  .desglose-info { flex: 1; }
+  .desglose-rubro { font-weight: 700; color: var(--navy); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .desglose-desc { font-size: 11px; color: #666; margin-top: 2px; }
+  .desglose-cost { text-align: right; flex-shrink: 0; }
+  .desglose-cost-main { font-weight: 700; color: var(--navy); font-size: 13px; }
+  .desglose-cost-sub { font-size: 10px; color: #888; }
+
+  /* ── Proyectos list ── */
+  .proyecto-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: #fff; cursor: pointer; transition: all .15s; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .proyecto-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(184,92,56,.12); }
+  .proyecto-nombre { font-weight: 700; color: var(--navy); font-size: 14px; }
+  .proyecto-meta { font-size: 11px; color: #888; margin-top: 3px; }
+  .proyecto-cost { text-align: right; flex-shrink: 0; }
+  .proyecto-cost-val { font-weight: 700; color: var(--navy); font-size: 13px; }
+
+  /* ── Historial ── */
+  .hist-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #FAF5F0; font-size: 12px; }
+  .hist-rubro { flex: 1; color: var(--navy); font-weight: 600; }
+  .hist-change { display: flex; align-items: center; gap: 6px; }
+  .hist-meta { color: #999; font-size: 11px; text-align: right; }
+
+  /* ── Proposal card ── */
+  .proposal-header { background: var(--navy); padding: 13px 18px; display: flex; align-items: center; gap: 11px; }
+  .proposal-num { background: var(--accent); color: #fff; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0; }
+  .proposal-name { color: #fff; font-weight: 700; font-size: 14px; font-family: 'Georgia', serif; }
+  .proposal-concept { color: #A0B4C8; font-size: 11px; }
+  .section-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 7px; }
+  .tag { background: #F0EBE3; color: var(--navy); border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 500; display: inline-block; margin: 2px; }
+  .ref-tag { background: #fff; border: 1px solid var(--gold); color: #7A5C1E; border-radius: 20px; padding: 3px 9px; font-size: 10px; display: inline-block; margin: 2px; }
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .feature-item { background: #FDFAF7; border: 1px solid #EDE5DC; border-radius: 7px; padding: 7px 9px; font-size: 11px; color: var(--navy); display: flex; gap: 5px; align-items: flex-start; }
+  .mood-box { background: linear-gradient(135deg, rgba(27,42,59,.04), rgba(184,92,56,.06)); border-radius: 8px; padding: 9px 12px; border-left: 3px solid var(--accent); font-size: 12px; color: #444; font-style: italic; }
+  .color-swatch { display: flex; align-items: center; gap: 5px; background: #F7F3EE; border-radius: 5px; padding: 3px 8px; }
+  .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1); flex-shrink: 0; }
+
+  /* ── Toast ── */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: #C0392B; }
+  #toast.success { background: var(--green); }
+
+  /* ── Misc ── */
+  .spinner { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; padding: 48px 24px; color: #999; }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-text { font-size: 14px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .flex { display: flex; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .gap-8 { gap: 8px; }
+  .gap-12 { gap: 12px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-12 { margin-bottom: 12px; }
+  .mt-12 { margin-top: 12px; }
+  .warn-box { background: #FFFBF0; border: 1px solid rgba(201,150,58,.35); border-radius: 10px; padding: 13px 16px; }
+  .info-box { background: #F7F3EE; border: 1px solid var(--border); border-radius: 10px; padding: 13px 16px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  small { font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">🏗</div>
+    <div class="auth-title">Stand Estimator</div>
+    <div class="auth-sub">DALI Arquitectura 360°</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="setAuthTab('login')">Ingresar</button>
+      <button class="auth-tab" onclick="setAuthTab('register')">Registrarse</button>
+    </div>
+
+    <div id="auth-login">
+      <div class="mb-12">
+        <label class="field-label">Email</label>
+        <input type="email" id="login-email" placeholder="tu@email.com" style="width:100%" />
+      </div>
+      <div class="mb-16">
+        <label class="field-label">Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••" style="width:100%" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()" id="btn-login">Ingresar</button>
+    </div>
+
+    <div id="auth-register" style="display:none">
+      <div class="mb-12">
+        <label class="field-label">Nombre completo</label>
+        <input type="text" id="reg-name" placeholder="Juan Pérez" style="width:100%" />
+      </div>
+      <div class="mb-12">
+        <label class="field-label">Email</label>
+        <input type="email" id="reg-email" placeholder="tu@email.com" style="width:100%" />
+      </div>
+      <div class="mb-16">
+        <label class="field-label">Contraseña</label>
+        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" style="width:100%" />
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doRegister()" id="btn-register">Crear cuenta</button>
+      <p style="font-size:11px;color:#999;margin-top:10px;">La cuenta queda pendiente hasta que un admin la apruebe.</p>
+    </div>
+
+    <div id="auth-error" style="display:none;margin-top:12px;background:#FFF0EE;border:1px solid #F8C5BC;border-radius:7px;padding:9px 13px;color:#C0392B;font-size:12px;"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <div class="logo-icon">🏗</div>
+      <div>
+        <div class="logo-text">STAND ESTIMATOR</div>
+        <div class="logo-sub">DALI Arquitectura 360°</div>
+      </div>
+    </div>
+    <nav>
+      <button class="active" onclick="showView('estimador')" id="nav-estimador">✦ Nuevo estimado</button>
+      <button onclick="showView('proyectos')" id="nav-proyectos">📁 Proyectos</button>
+      <button onclick="showView('costos')" id="nav-costos" id="nav-costos-btn">⚙ Base de costos</button>
+      <button onclick="showView('equipo')" id="nav-equipo">👥 Equipo</button>
+    </nav>
+    <div class="user-area">
+      <div class="avatar" id="user-avatar">?</div>
+      <div class="user-name" id="user-name-display">—</div>
+      <button class="btn btn-secondary" onclick="doLogout()" style="padding:5px 12px;font-size:11px;margin-left:6px">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── ESTIMADOR ── -->
+    <div id="view-estimador">
+      <div id="result-view" style="display:none"></div>
+      <div id="form-view">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Nuevo proyecto</h2>
+              <small id="base-total-label" style="color:#666">Cargando base de costos...</small>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="grid-2 mb-16" style="gap:16px">
+              <div>
+                <label class="field-label">Nombre del proyecto *</label>
+                <input type="text" id="proj-nombre" placeholder="Ej: Stand Martínez — Expo Rural 2026" style="width:100%" />
+              </div>
+              <div>
+                <label class="field-label">Cliente</label>
+                <input type="text" id="proj-cliente" placeholder="Nombre del cliente" style="width:100%" />
+              </div>
+            </div>
+            <div class="mb-16">
+              <label class="field-label">Brief (texto libre)</label>
+              <textarea id="proj-brief" rows="4" placeholder="Descripción del evento, marca, objetivos del stand, estilo deseado, competidores en el sector..."></textarea>
+            </div>
+            <div class="mb-16" style="max-width:180px">
+              <label class="field-label">Superficie (m²)</label>
+              <input type="number" id="proj-sqm" placeholder="Ej: 36" style="width:100%" />
+            </div>
+            <div class="grid-3 mb-16">
+              <div class="dropzone" id="dz-brief" ondragover="dzOver(event,'dz-brief')" ondragleave="dzOut('dz-brief')" ondrop="dzDrop(event,'brief')" onclick="document.getElementById('file-brief').click()">
+                <input type="file" id="file-brief" style="display:none" accept=".pdf,.jpg,.jpeg,.png" onchange="dzFile(this,'brief')">
+                <div class="dropzone-icon">📄</div>
+                <div class="dropzone-label" id="dz-brief-label">Brief del cliente</div>
+                <div class="dropzone-sub" id="dz-brief-sub">PDF o imagen</div>
+              </div>
+              <div class="dropzone" id="dz-planta" ondragover="dzOver(event,'dz-planta')" ondragleave="dzOut('dz-planta')" ondrop="dzDrop(event,'planta')" onclick="document.getElementById('file-planta').click()">
+                <input type="file" id="file-planta" style="display:none" accept=".pdf,.jpg,.jpeg,.png" onchange="dzFile(this,'planta')">
+                <div class="dropzone-icon">📐</div>
+                <div class="dropzone-label" id="dz-planta-label">Planta del stand</div>
+                <div class="dropzone-sub" id="dz-planta-sub">PDF o imagen</div>
+              </div>
+              <div class="dropzone" id="dz-render" ondragover="dzOver(event,'dz-render')" ondragleave="dzOut('dz-render')" ondrop="dzDrop(event,'render')" onclick="document.getElementById('file-render').click()">
+                <input type="file" id="file-render" style="display:none" accept=".jpg,.jpeg,.png,.pdf" onchange="dzFile(this,'render')">
+                <div class="dropzone-icon">🖼</div>
+                <div class="dropzone-label" id="dz-render-label">Render de referencia</div>
+                <div class="dropzone-sub" id="dz-render-sub">Imagen</div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-full" id="btn-generate" onclick="generateEstimate()">
+              ✦ Generar estimado y propuestas
+            </button>
+            <div id="gen-error" style="display:none;margin-top:10px" class="warn-box"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PROYECTOS ── -->
+    <div id="view-proyectos" style="display:none">
+      <div class="flex-between mb-16">
+        <h2 style="font-family:'Georgia',serif;color:var(--navy);font-size:20px">Proyectos del equipo</h2>
+        <button class="btn btn-primary" onclick="showView('estimador')">+ Nuevo proyecto</button>
+      </div>
+      <div id="proyectos-list">
+        <div class="empty-state"><div class="spinner">⟳</div><div class="empty-text mt-12">Cargando...</div></div>
+      </div>
+    </div>
+
+    <!-- ── BASE DE COSTOS ── -->
+    <div id="view-costos" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Base de costos del estudio</h2>
+            <small style="color:#666">Compartida con todo el equipo · Los cambios son visibles para todos</small>
+          </div>
+          <div class="flex gap-8" style="flex-wrap:wrap;align-items:center">
+            <!-- Inflación -->
+            <div style="display:flex;align-items:center;gap:6px;background:#FFFBF0;border:1px solid rgba(201,150,58,.4);border-radius:8px;padding:6px 10px">
+              <span style="font-size:11px;color:#7A5C1E;font-weight:600">Actualizar</span>
+              <input type="number" id="inflacion-pct" placeholder="%" style="width:46px;padding:3px 5px;font-size:12px;text-align:center;border-radius:5px;border:1px solid #DDD4C8;background:#fff" />
+              <span style="font-size:11px;color:#7A5C1E">%</span>
+              <input type="text" id="inflacion-motivo" placeholder="motivo..." style="width:100px;padding:3px 7px;font-size:11px;border-radius:5px;border:1px solid #DDD4C8;background:#fff" />
+              <button class="btn btn-gold" style="padding:4px 10px;font-size:11px" onclick="applyInflacion()">Aplicar</button>
+            </div>
+            <button class="btn btn-primary" onclick="saveRubros()" id="btn-save-rubros">Guardar cambios</button>
+          </div>
+        </div>
+        <!-- Total badge -->
+        <div style="background:rgba(27,42,59,.04);border-bottom:1px solid #EDE5DC;padding:8px 20px;display:flex;align-items:center;gap:14px">
+          <span style="font-size:12px;color:#666">Total base acumulado:</span>
+          <span id="rubros-total" style="font-weight:700;color:var(--navy);font-size:15px">—</span>
+          <span id="rubros-count" style="font-size:11px;color:#999"></span>
+          <span id="rubros-updated" style="font-size:11px;color:#999;margin-left:auto"></span>
+        </div>
+        <!-- Table -->
+        <div class="card-body" style="padding:10px 20px 20px">
+          <div class="rubros-grid rubros-header">
+            <div></div><div>Rubro</div><div>Proveedor</div><div>USD/m²</div><div>Notas</div><div></div>
+          </div>
+          <div id="rubros-rows"></div>
+          <button class="btn btn-secondary mt-12" style="border:1.5px dashed #DDD4C8;background:none;color:#888;font-size:12px" onclick="addRubro()">+ Agregar rubro</button>
+        </div>
+      </div>
+      <!-- Historial -->
+      <div class="card">
+        <div class="card-header"><h3>Historial de actualizaciones</h3></div>
+        <div class="card-body" id="historial-list">
+          <div class="empty-state"><div class="spinner">⟳</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EQUIPO ── -->
+    <div id="view-equipo" style="display:none">
+      <div class="card">
+        <div class="card-header"><h2>Miembros del equipo</h2></div>
+        <div class="card-body" id="equipo-list">
+          <div class="empty-state"><div class="spinner">⟳</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG — reemplazá con tus credenciales de Supabase
+// ═══════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://wmhhkksmomrfzxmblzwx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtaGhra3Ntb21yZnp4bWJsend4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MTc5MTEsImV4cCI6MjA5NzE5MzkxMX0.bvavn2RwK21Y5m0KmfDqeB4TWPUYN0CMs4bt8p54EmY';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let currentProfile = null;
+let rubros = [];
+let uploadedFiles = { brief: null, planta: null, render: null };
+
+// ═══════ INIT ═══════
+window.addEventListener('DOMContentLoaded', async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await initApp(session.user);
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) await initApp(session.user);
+    if (event === 'SIGNED_OUT') showAuth();
+  });
+});
+
+async function initApp(user) {
+  currentUser = user;
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  currentProfile = profile;
+
+  document.getElementById('auth-screen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+
+  const initials = (profile?.full_name || user.email || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name-display').textContent = profile?.full_name || user.email;
+
+  await loadRubros();
+  showView('estimador');
+}
+
+function showAuth() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ═══════ AUTH ═══════
+function setAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(tab === 'login' ? 'ingresar' : 'registr')));
+  document.getElementById('auth-login').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('auth-register').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('btn-login');
+  if (!email || !pass) return showAuthError('Completá email y contraseña');
+  btn.disabled = true; btn.textContent = 'Ingresando...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { showAuthError(error.message); btn.disabled = false; btn.textContent = 'Ingresar'; }
+}
+
+async function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const btn = document.getElementById('btn-register');
+  if (!name || !email || !pass) return showAuthError('Completá todos los campos');
+  if (pass.length < 6) return showAuthError('La contraseña debe tener al menos 6 caracteres');
+  btn.disabled = true; btn.textContent = 'Creando cuenta...';
+  const { error } = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+  if (error) { showAuthError(error.message); btn.disabled = false; btn.textContent = 'Crear cuenta'; }
+  else { showAuthError('✓ Cuenta creada. Revisá tu email para confirmar.'); document.getElementById('auth-error').style.background = '#E8F5EE'; document.getElementById('auth-error').style.color = 'var(--green)'; document.getElementById('auth-error').style.borderColor = '#A8D5B8'; }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = '';
+}
+
+// ═══════ VIEWS ═══════
+const views = ['estimador', 'proyectos', 'costos', 'equipo'];
+async function showView(v) {
+  views.forEach(id => {
+    document.getElementById('view-' + id).style.display = id === v ? '' : 'none';
+    const nav = document.getElementById('nav-' + id);
+    if (nav) nav.classList.toggle('active', id === v);
+  });
+  if (v === 'proyectos') await loadProyectos();
+  if (v === 'costos') { await loadRubros(); await loadHistorial(); }
+  if (v === 'equipo') await loadEquipo();
+}
+
+// ═══════ RUBROS ═══════
+async function loadRubros() {
+  const { data, error } = await sb.from('rubros').select('*').eq('activo', true).order('orden');
+  if (!error && data) {
+    rubros = data;
+    renderRubros();
+    updateTotalLabel();
+  }
+}
+
+function renderRubros() {
+  const container = document.getElementById('rubros-rows');
+  if (!container) return;
+  const total = rubros.reduce((s, r) => s + parseFloat(r.usd_m2 || 0), 0);
+  document.getElementById('rubros-total').textContent = `USD ${total.toLocaleString('es-AR', {minimumFractionDigits: 0})}/m²`;
+  document.getElementById('rubros-count').textContent = `(${rubros.length} rubros)`;
+
+  container.innerHTML = rubros.map((r, i) => `
+    <div class="rubros-grid rubro-row" data-id="${r.id}">
+      <span style="font-size:18px;text-align:center">${r.icon || '📦'}</span>
+      <input class="rubro-input" style="font-weight:600;font-size:13px" value="${escHtml(r.label)}" onchange="updateRubro('${r.id}','label',this.value)" />
+      <input class="rubro-small" value="${escHtml(r.proveedor || '')}" placeholder="Proveedor..." onchange="updateRubro('${r.id}','proveedor',this.value)" />
+      <div style="display:flex;align-items:center;gap:3px">
+        <span style="font-size:10px;color:#888">$</span>
+        <input type="number" class="rubro-num" value="${r.usd_m2}" onchange="updateRubro('${r.id}','usd_m2',parseFloat(this.value)||0)" style="width:100%" />
+      </div>
+      <input class="rubro-small" value="${escHtml(r.notas || '')}" placeholder="Notas..." onchange="updateRubro('${r.id}','notas',this.value)" />
+      <button class="del-btn" onclick="deleteRubro('${r.id}')">×</button>
+    </div>
+  `).join('');
+}
+
+function updateRubro(id, field, val) {
+  const idx = rubros.findIndex(r => r.id === id);
+  if (idx >= 0) {
+    rubros[idx][field] = val;
+    const total = rubros.reduce((s, r) => s + parseFloat(r.usd_m2 || 0), 0);
+    document.getElementById('rubros-total').textContent = `USD ${total.toLocaleString('es-AR', {minimumFractionDigits: 0})}/m²`;
+    updateTotalLabel();
+  }
+}
+
+function updateTotalLabel() {
+  const total = rubros.reduce((s, r) => s + parseFloat(r.usd_m2 || 0), 0);
+  const el = document.getElementById('base-total-label');
+  if (el) el.textContent = `Base de costos cargada: USD ${total.toFixed(0)}/m² (${rubros.length} rubros)`;
+  const nav = document.getElementById('nav-costos');
+  if (nav) nav.textContent = `⚙ Base · USD ${total.toFixed(0)}/m²`;
+}
+
+async function saveRubros() {
+  const btn = document.getElementById('btn-save-rubros');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    for (const r of rubros) {
+      await sb.from('rubros').update({
+        label: r.label, icon: r.icon, proveedor: r.proveedor,
+        usd_m2: r.usd_m2, notas: r.notas, updated_by: currentUser.id, updated_at: new Date().toISOString()
+      }).eq('id', r.id);
+    }
+    toast('✓ Cambios guardados', 'success');
+  } catch(e) { toast('Error al guardar: ' + e.message, 'error'); }
+  btn.disabled = false; btn.textContent = 'Guardar cambios';
+}
+
+async function addRubro() {
+  const { data, error } = await sb.from('rubros').insert({
+    label: 'Nuevo rubro', icon: '📦', proveedor: '', usd_m2: 0, notas: '', orden: rubros.length + 1, updated_by: currentUser.id
+  }).select().single();
+  if (!error) { rubros.push(data); renderRubros(); }
+}
+
+async function deleteRubro(id) {
+  if (!confirm('¿Eliminar este rubro?')) return;
+  await sb.from('rubros').update({ activo: false }).eq('id', id);
+  rubros = rubros.filter(r => r.id !== id);
+  renderRubros(); updateTotalLabel();
+  toast('Rubro eliminado');
+}
+
+async function applyInflacion() {
+  const pct = parseFloat(document.getElementById('inflacion-pct').value);
+  const motivo = document.getElementById('inflacion-motivo').value.trim() || `Actualización ${pct}%`;
+  if (isNaN(pct) || pct === 0) return toast('Ingresá un porcentaje válido', 'error');
+  const factor = 1 + pct / 100;
+
+  // Guardar historial y actualizar
+  for (const r of rubros) {
+    const anterior = parseFloat(r.usd_m2);
+    const nuevo = Math.round(anterior * factor * 100) / 100;
+    await sb.from('rubros_historial').insert({ rubro_id: r.id, usd_m2_anterior: anterior, usd_m2_nuevo: nuevo, motivo, changed_by: currentUser.id });
+    await sb.from('rubros').update({ usd_m2: nuevo, updated_by: currentUser.id, updated_at: new Date().toISOString() }).eq('id', r.id);
+    r.usd_m2 = nuevo;
+  }
+  renderRubros(); updateTotalLabel();
+  document.getElementById('inflacion-pct').value = '';
+  document.getElementById('inflacion-motivo').value = '';
+  toast(`✓ Precios actualizados +${pct}%`, 'success');
+  await loadHistorial();
+}
+
+async function loadHistorial() {
+  const { data } = await sb.from('rubros_historial')
+    .select('*, rubro:rubros(label), changed_by_profile:profiles(full_name)')
+    .order('changed_at', { ascending: false }).limit(20);
+
+  const el = document.getElementById('historial-list');
+  if (!el) return;
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Sin historial todavía</div></div>'; return; }
+
+  el.innerHTML = data.map(h => {
+    const diff = h.usd_m2_nuevo - h.usd_m2_anterior;
+    const pct = ((diff / h.usd_m2_anterior) * 100).toFixed(1);
+    const isUp = diff > 0;
+    const fecha = new Date(h.changed_at).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+    return `<div class="hist-row">
+      <div class="hist-rubro">${h.rubro?.label || '—'}</div>
+      <div class="hist-change">
+        <span style="color:#999;font-size:11px">USD ${h.usd_m2_anterior}</span>
+        <span style="color:#999">→</span>
+        <span style="font-weight:700;color:var(--navy)">USD ${h.usd_m2_nuevo}</span>
+        <span class="badge ${isUp ? 'badge-up' : 'badge-down'}" style="font-size:10px">${isUp?'+':''}${pct}%</span>
+      </div>
+      <div class="hist-meta">
+        <div>${h.motivo || '—'}</div>
+        <div>${fecha} · ${h.changed_by_profile?.full_name || '?'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════ ESTIMADOR ═══════
+function dzOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('over'); }
+function dzOut(id) { document.getElementById(id).classList.remove('over'); }
+function dzDrop(e, type) {
+  e.preventDefault();
+  const id = 'dz-' + type; dzOut(id);
+  const f = e.dataTransfer.files[0]; if (f) setFile(type, f);
+}
+function dzFile(input, type) { if (input.files[0]) setFile(type, input.files[0]); }
+function setFile(type, file) {
+  uploadedFiles[type] = file;
+  const dz = document.getElementById('dz-' + type);
+  dz.classList.add('has-file'); dz.classList.remove('over');
+  document.getElementById('dz-' + type + '-label').textContent = file.name;
+  document.getElementById('dz-' + type + '-sub').textContent = (file.size/1024).toFixed(0) + ' KB · click para cambiar';
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Error al leer archivo'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function generateEstimate() {
+  const nombre = document.getElementById('proj-nombre').value.trim();
+  const cliente = document.getElementById('proj-cliente').value.trim();
+  const brief = document.getElementById('proj-brief').value.trim();
+  const sqm = document.getElementById('proj-sqm').value;
+
+  if (!nombre) return toast('Ingresá un nombre para el proyecto', 'error');
+  if (!brief && !uploadedFiles.brief && !uploadedFiles.planta && !uploadedFiles.render) return toast('Agregá al menos un brief o archivo', 'error');
+
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+
+  const steps = ['Procesando archivos...', 'Analizando brief...', 'Calculando costos...', 'Generando propuestas...'];
+  let si = 0;
+  const stepInterval = setInterval(() => { btn.innerHTML = `<span class="spinner">⟳</span> ${steps[si++ % steps.length]}`; }, 2000);
+
+  document.getElementById('gen-error').style.display = 'none';
+
+  try {
+    const messages = [];
+    if (brief) messages.push({ role: 'user', content: `BRIEF DEL CLIENTE:\n${brief}` });
+
+    // Adjuntar archivos como imágenes/docs
+    const fileTypes = ['brief', 'planta', 'render'];
+    const fileLabels = { brief: 'ARCHIVO DE BRIEF', planta: 'PLANTA DEL STAND', render: 'RENDER DE REFERENCIA' };
+    const contentParts = [];
+    if (brief) contentParts.push({ type: 'text', text: `BRIEF DEL CLIENTE:\n${brief}` });
+
+    for (const type of fileTypes) {
+      const file = uploadedFiles[type];
+      if (!file) continue;
+      const b64 = await fileToBase64(file);
+      contentParts.push({ type: 'text', text: fileLabels[type] + ':' });
+      if (file.type.startsWith('image/')) {
+        contentParts.push({ type: 'image', source: { type: 'base64', media_type: file.type, data: b64 } });
+      } else if (file.type === 'application/pdf') {
+        contentParts.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } });
+      }
+    }
+
+    const response = await fetch('/api/estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: contentParts }], rubros, sqm: sqm || null })
+    });
+
+    if (!response.ok) throw new Error('Error en la API: ' + response.status);
+    const result = await response.json();
+
+    // Guardar en Supabase
+    const { data: saved, error: saveErr } = await sb.from('proyectos').insert({
+      nombre, cliente, brief_texto: brief, superficie_m2: sqm || null,
+      resultado: result, created_by: currentUser.id
+    }).select().single();
+
+    if (saveErr) console.warn('No se pudo guardar el proyecto:', saveErr.message);
+
+    clearInterval(stepInterval);
+    renderResult(result, saved?.id, nombre, cliente);
+  } catch(e) {
+    clearInterval(stepInterval);
+    const errEl = document.getElementById('gen-error');
+    errEl.textContent = '⚠ ' + e.message; errEl.style.display = '';
+    btn.disabled = false; btn.textContent = '✦ Generar estimado y propuestas';
+    toast(e.message, 'error');
+  }
+}
+
+function renderResult(r, proyId, nombre, cliente) {
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = false; btn.textContent = '✦ Generar estimado y propuestas';
+
+  document.getElementById('form-view').style.display = 'none';
+  const rv = document.getElementById('result-view');
+  rv.style.display = '';
+
+  const total = r.costo_estimado;
+  rv.innerHTML = `
+    <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <button class="btn btn-secondary" onclick="resetForm()">← Nuevo proyecto</button>
+      <div class="flex gap-8">
+        ${proyId ? `<button class="btn btn-secondary" onclick="showView('proyectos')">Ver todos los proyectos</button>` : ''}
+        <button class="btn btn-gold" onclick="window.print()">🖨 Imprimir</button>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-bar">
+      <div style="flex:1;min-width:180px">
+        <div style="color:#A0B4C8;font-size:10px;text-transform:uppercase;letter-spacing:.08em">Proyecto</div>
+        <div style="color:#fff;font-weight:700;font-size:15px;font-family:'Georgia',serif;margin-top:3px">${escHtml(nombre)}</div>
+        ${cliente ? `<div style="color:#A0B4C8;font-size:12px">${escHtml(cliente)}</div>` : ''}
+        <div style="color:#778B9B;font-size:12px;margin-top:4px">${r.resumen_proyecto || ''}</div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+        ${r.superficie_m2 ? `<div class="summary-stat"><div class="summary-stat-label">Superficie</div><div class="summary-stat-value">${r.superficie_m2}<span style="font-size:12px;font-weight:400"> m²</span></div></div>` : ''}
+        ${total ? `
+          <div class="summary-stat"><div class="summary-stat-label">Costo/m²</div><div class="summary-stat-value gold">USD ${total.por_m2_min}–${total.por_m2_max}</div></div>
+          <div class="summary-stat"><div class="summary-stat-label">Total estimado</div><div class="summary-stat-value">USD ${(total.total_min||0).toLocaleString()}–${(total.total_max||0).toLocaleString()}</div></div>
+        ` : ''}
+        ${r.categoria ? `<span class="badge badge-accent" style="text-transform:capitalize">${r.categoria}</span>` : ''}
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="res-tabs">
+      <button class="tab active" onclick="resTab('costos',this)">💰 Costos</button>
+      <button class="tab" onclick="resTab('materiales',this)">🧱 Materialidades</button>
+      <button class="tab" onclick="resTab('propuestas',this)">✦ Propuestas de diseño</button>
+    </div>
+
+    <!-- Tab: Costos -->
+    <div id="res-costos">
+      <div class="card">
+        <div class="card-header" style="justify-content:space-between">
+          <h3>Desglose por rubro</h3>
+          <small style="color:#888">Basado en tu tabla de costos</small>
+        </div>
+        <div style="padding:0 18px">
+          ${(r.desglose_costos || []).map((item, i, arr) => {
+            const aj = item.ajuste;
+            const ajColor = aj === 'aumentado' ? '#C0392B' : aj === 'reducido' ? 'var(--green)' : aj === 'agregado' ? 'var(--gold)' : null;
+            return `<div class="desglose-row" style="${i===arr.length-1?'border-bottom:none':''}">
+              <div class="desglose-pct">${item.porcentaje}%</div>
+              <div class="desglose-info">
+                <div class="desglose-rubro">
+                  ${escHtml(item.rubro)}
+                  ${aj && aj!=='igual' ? `<span class="badge" style="font-size:10px;background:${ajColor}20;color:${ajColor}">${aj}</span>` : ''}
+                </div>
+                <div class="desglose-desc">${escHtml(item.descripcion||'')}</div>
+              </div>
+              <div class="desglose-cost">
+                <div class="desglose-cost-main">USD ${item.costo_m2_usd}/m²</div>
+                ${r.superficie_m2 ? `<div class="desglose-cost-sub">≈ USD ${(item.costo_m2_usd * r.superficie_m2).toLocaleString()} total</div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      ${(r.condicionantes||[]).length ? `
+        <div class="warn-box mb-12">
+          <div style="font-weight:700;color:#7A5C1E;font-size:12px;margin-bottom:8px">⚠ Factores que pueden modificar el precio</div>
+          ${r.condicionantes.map(c => `<div style="display:flex;gap:7px;font-size:12px;color:#555;margin-bottom:5px"><span style="color:var(--gold)">›</span><span>${escHtml(c)}</span></div>`).join('')}
+        </div>` : ''}
+      ${r.notas_finales ? `<div class="card"><div class="card-body"><div style="font-weight:700;color:var(--navy);font-size:12px;margin-bottom:6px">📋 Notas para el cliente</div><p style="font-size:12px;color:#555;line-height:1.6">${escHtml(r.notas_finales)}</p></div></div>` : ''}
+    </div>
+
+    <!-- Tab: Materiales -->
+    <div id="res-materiales" style="display:none">
+      <div class="card">
+        <div class="card-header"><h3>Materialidades sugeridas</h3></div>
+        <div class="card-body grid-2">
+          ${(r.materialidades||[]).map(m => `
+            <div style="background:#FDFAF7;border:1px solid var(--border);border-radius:9px;padding:12px">
+              <div style="font-weight:700;color:var(--navy);font-size:12px;margin-bottom:3px">${escHtml(m.elemento)}</div>
+              <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:3px">${escHtml(m.material_sugerido)}</div>
+              ${m.observacion ? `<div style="font-size:11px;color:#777">${escHtml(m.observacion)}</div>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Propuestas -->
+    <div id="res-propuestas" style="display:none">
+      <div class="grid-2">
+        ${(r.propuestas||[]).map((p, i) => renderProposal(p, i)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderProposal(p, i) {
+  return `<div class="card">
+    <div class="proposal-header">
+      <div class="proposal-num">${i+1}</div>
+      <div>
+        <div class="proposal-name">${escHtml(p.name||'Propuesta '+(i+1))}</div>
+        <div class="proposal-concept">${escHtml(p.concept||'')}</div>
+      </div>
+    </div>
+    <div style="padding:16px">
+      ${p.palette?.length ? `<div class="mb-12"><div class="section-label">Paleta de color</div><div style="display:flex;flex-wrap:wrap;gap:5px">${p.palette.map(c=>`<div class="color-swatch"><div class="swatch" style="background:${c.hex}"></div><span style="font-size:11px;color:var(--navy);font-weight:600">${c.name}</span></div>`).join('')}</div></div>` : ''}
+      ${p.materials?.length ? `<div class="mb-12"><div class="section-label">Materialidades</div><div>${(Array.isArray(p.materials)?p.materials:p.materials.split(',')).map(m=>`<span class="tag">${m.trim()}</span>`).join('')}</div></div>` : ''}
+      ${p.spatial ? `<div class="mb-12"><div class="section-label">Concepto espacial</div><p style="font-size:12px;color:#444;line-height:1.6">${escHtml(p.spatial)}</p></div>` : ''}
+      ${p.features?.length ? `<div class="mb-12"><div class="section-label">Elementos clave</div><div class="feature-grid">${(Array.isArray(p.features)?p.features:p.features.split('|')).map(f=>`<div class="feature-item"><span style="color:var(--accent)">✦</span><span>${f.trim()}</span></div>`).join('')}</div></div>` : ''}
+      ${p.references?.length ? `<div class="mb-12"><div class="section-label">Referencias visuales</div><div>${p.references.map(r=>`<span class="ref-tag">${escHtml(r)}</span>`).join('')}</div></div>` : ''}
+      ${p.mood ? `<div class="mood-box">"${escHtml(p.mood)}"</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function resTab(id, btn) {
+  ['costos','materiales','propuestas'].forEach(t => {
+    document.getElementById('res-'+t).style.display = t===id ? '' : 'none';
+  });
+  document.querySelectorAll('#res-tabs .tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function resetForm() {
+  document.getElementById('result-view').style.display = 'none';
+  document.getElementById('form-view').style.display = '';
+  uploadedFiles = { brief: null, planta: null, render: null };
+  ['brief','planta','render'].forEach(t => {
+    const dz = document.getElementById('dz-'+t);
+    dz.classList.remove('has-file','over');
+    document.getElementById('dz-'+t+'-label').textContent = { brief:'Brief del cliente', planta:'Planta del stand', render:'Render de referencia'}[t];
+    document.getElementById('dz-'+t+'-sub').textContent = t==='render' ? 'Imagen' : 'PDF o imagen';
+  });
+}
+
+// ═══════ PROYECTOS ═══════
+async function loadProyectos() {
+  const { data, error } = await sb.from('proyectos')
+    .select('*, created_by_profile:profiles(full_name)')
+    .order('created_at', { ascending: false });
+
+  const el = document.getElementById('proyectos-list');
+  if (error || !data || data.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><div class="empty-text">Sin proyectos todavía. Creá el primero.</div></div>';
+    return;
+  }
+
+  const estadoColors = { borrador: 'badge-muted', enviado: 'badge-gold', aprobado: 'badge-green', rechazado: 'badge-red' };
+  el.innerHTML = data.map(p => {
+    const cost = p.resultado?.costo_estimado;
+    const fecha = new Date(p.created_at).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    return `<div class="proyecto-card mb-12" onclick="openProyecto('${p.id}')">
+      <div style="flex:1">
+        <div class="proyecto-nombre">${escHtml(p.nombre)}</div>
+        <div class="proyecto-meta">
+          ${p.cliente ? `<strong>${escHtml(p.cliente)}</strong> · ` : ''}
+          ${p.superficie_m2 ? p.superficie_m2 + ' m² · ' : ''}
+          ${fecha} · ${p.created_by_profile?.full_name || '—'}
+        </div>
+      </div>
+      <div class="proyecto-cost">
+        ${cost ? `<div class="proyecto-cost-val">USD ${(cost.total_min||0).toLocaleString()}–${(cost.total_max||0).toLocaleString()}</div>
+                  <div style="font-size:10px;color:#888">USD ${cost.por_m2_min}–${cost.por_m2_max}/m²</div>` : ''}
+        <div style="margin-top:5px"><span class="badge ${estadoColors[p.estado]||'badge-muted'}" style="text-transform:capitalize">${p.estado}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let proyectosCache = {};
+async function openProyecto(id) {
+  let p = proyectosCache[id];
+  if (!p) {
+    const { data } = await sb.from('proyectos').select('*').eq('id', id).single();
+    p = data; proyectosCache[id] = p;
+  }
+  if (!p?.resultado) return toast('Proyecto sin resultado disponible', 'error');
+  showView('estimador');
+  document.getElementById('proj-nombre').value = p.nombre || '';
+  document.getElementById('proj-cliente').value = p.cliente || '';
+  document.getElementById('proj-brief').value = p.brief_texto || '';
+  document.getElementById('proj-sqm').value = p.superficie_m2 || '';
+  renderResult(p.resultado, p.id, p.nombre, p.cliente);
+}
+
+// ═══════ EQUIPO ═══════
+async function loadEquipo() {
+  const { data } = await sb.from('profiles').select('*').order('created_at');
+  const el = document.getElementById('equipo-list');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty-state">Sin miembros</div>'; return; }
+  el.innerHTML = data.map(p => {
+    const initials = (p.full_name||p.email||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const isMe = p.id === currentUser?.id;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div class="avatar" style="width:36px;height:36px;font-size:13px">${initials}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--navy);font-size:13px">${escHtml(p.full_name||'—')} ${isMe?'<span class="badge badge-muted" style="font-size:10px">vos</span>':''}</div>
+        <div style="font-size:11px;color:#888">${escHtml(p.email||'')}</div>
+      </div>
+      <span class="badge ${p.role==='admin'?'badge-accent':'badge-muted'}">${p.role}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════ UTILS ═══════
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' ' + type : '');
+  setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>
