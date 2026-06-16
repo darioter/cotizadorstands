@@ -726,9 +726,14 @@ function renderPIPRubrosA(){
   const cont=document.getElementById('pip-rubros-a');
   if(!cont)return;
   const sections={};
+  // Pre-inicializar todas las secciones conocidas en orden
+  RUBRO_SECTIONS.forEach(sec=>{sections[sec.key]={label:sec.label,items:[]};});
+  // Sección catch-all para ítems sin sección válida
+  if(!sections['otros'])sections['otros']={label:'📦 Otros / Servicios',items:[]};
   pipRubrosA.forEach((r,i)=>{
-    if(!sections[r.section])sections[r.section]={label:r.sectionLabel,items:[]};
-    sections[r.section].items.push({...r,idx:i});
+    const key=sections[r.section]?r.section:'otros';
+    if(!sections[key])sections[key]={label:r.sectionLabel||'📦 Otros',items:[]};
+    sections[key].items.push({...r,idx:i});
   });
   let html='';
   Object.values(sections).forEach(sec=>{
@@ -776,7 +781,7 @@ function updatePipA(idx,field,val){pipRubrosA[idx][field]=val;renderPIPRubrosA()
 function updatePipB(idx,field,val){pipRubrosB[idx][field]=val;renderPIPRubrosB();}
 function removePipA(idx){pipRubrosA.splice(idx,1);renderPIPRubrosA();}
 function removePipB(idx){pipRubrosB.splice(idx,1);renderPIPRubrosB();}
-function addRubroA(){pipRubrosA.push({section:'otros',sectionLabel:'📦 Otros',id:'new'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0,cant:0,notas:''});renderPIPRubrosA();}
+function addRubroA(){pipRubrosA.push({section:'otros',sectionLabel:'📦 Otros / Servicios',id:'new'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0,cant:0,notas:''});renderPIPRubrosA();}
 function addRubroB(){pipRubrosB.push({id:'new'+Date.now(),label:'Nuevo ítem',unit:'global',precio:0,cant:1,notas:''});renderPIPRubrosB();}
 function getCVA(){return pipRubrosA.reduce((s,r)=>s+(r.cant*r.precio),0);}
 function getCVB(){return pipRubrosB.reduce((s,r)=>s+(r.cant*r.precio),0);}
