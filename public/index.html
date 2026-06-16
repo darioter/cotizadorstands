@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stand Estimator · DALI Arquitectura 360°</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --accent:#B85C38; --navy:#1B2A3B; --cream:#F7F3EE; --gold:#C9963A;
+  --green:#2E7D52; --border:#E8DDD4; --muted:#888; --card:#fff;
+  --red:#C0392B; --blue:#2C5F8A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:#1a1a1a;min-height:100vh}
+/* AUTH */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--navy)}
+.auth-box{background:#fff;border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.auth-logo{background:var(--accent);width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 18px}
+.auth-title{font-family:'Georgia',serif;font-size:22px;color:var(--navy);text-align:center;margin-bottom:4px}
+.auth-sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:24px}
+.auth-tabs{display:flex;gap:4px;background:#F0EAE2;border-radius:8px;padding:3px;margin-bottom:20px}
+.auth-tab{flex:1;border:none;border-radius:6px;padding:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;background:transparent;color:var(--muted)}
+.auth-tab.active{background:#fff;color:var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+/* LAYOUT */
+#app{display:none;flex-direction:column;min-height:100vh}
+header{background:var(--navy);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px}
+.logo-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo-icon{background:var(--accent);width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-text{color:#fff;font-weight:700;font-size:14px;font-family:'Georgia',serif}
+.logo-sub{color:#A0B4C8;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+nav{display:flex;gap:2px;background:rgba(255,255,255,.08);border-radius:8px;padding:3px;overflow-x:auto}
+nav button{border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;background:transparent;color:#A0B4C8;white-space:nowrap;font-family:inherit}
+nav button.active{background:#fff;color:var(--navy)}
+.user-area{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0}
+.user-name{color:#A0B4C8;font-size:11px}
+main{flex:1;max-width:1100px;margin:0 auto;padding:22px 16px;width:100%}
+/* CARDS */
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden;box-shadow:0 2px 12px rgba(27,42,59,.06);margin-bottom:14px}
+.card-header{background:#F7F3EE;padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-header h2{font-family:'Georgia',serif;font-size:16px;color:var(--navy);margin:0}
+.card-header h3{font-family:'Georgia',serif;font-size:14px;color:var(--navy);margin:0}
+.card-body{padding:16px 18px}
+/* FORMS */
+.field-label{display:block;font-size:10px;font-weight:700;color:#555;letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px}
+input,textarea,select{font-family:inherit;font-size:13px;color:var(--navy);background:#FDFAF7;border:1.5px solid #DDD4C8;border-radius:7px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+/* BUTTONS */
+.btn{border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;font-family:inherit;letter-spacing:.01em}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.88}
+.btn-secondary{background:#F0EAE2;color:var(--navy)}.btn-secondary:hover{background:#E8DDD4}
+.btn-gold{background:var(--gold);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-sm{padding:5px 11px;font-size:11px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-full{width:100%;justify-content:center;padding:13px;font-size:14px}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700}
+.badge-accent{background:var(--accent);color:#fff}
+.badge-gold{background:var(--gold);color:#fff}
+.badge-green{background:#E8F5EE;color:var(--green)}
+.badge-muted{background:#F0EAE2;color:#666}
+.badge-red{background:#FFF0EE;color:var(--red)}
+.badge-up{background:#FFF0EE;color:var(--red);font-size:9px}
+.badge-down{background:#E8F5EE;color:var(--green);font-size:9px}
+/* TABS */
+.tabs{display:flex;gap:3px;background:#EDE5DC;border-radius:10px;padding:3px;margin-bottom:14px}
+.tab{flex:1;border:none;border-radius:7px;padding:7px 8px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;background:transparent;color:var(--muted);font-family:inherit}
+.tab.active{background:#fff;color:var(--navy);box-shadow:0 1px 5px rgba(0,0,0,.08)}
+/* DROPZONE */
+.dropzone{border:2px dashed #C4B8AD;border-radius:9px;padding:14px 10px;cursor:pointer;background:#FDFAF7;transition:all .2s;text-align:center;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.dropzone:hover,.dropzone.over{border-color:var(--accent);background:#FFF3EC}
+.dropzone.has-file{border-color:var(--gold);background:#FFF9F0}
+/* SUMMARY BAR */
+.summary-bar{background:var(--navy);border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.stat-label{color:#A0B4C8;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.stat-value{color:#fff;font-weight:700;font-size:17px}
+.stat-value.gold{color:var(--gold)}
+.stat-value.green{color:#5CB98A}
+/* PIP GRID */
+.pip-grid{display:grid;gap:8px}
+.pip-section{background:#FAFAF8;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.pip-section-header{background:#F0EAE2;padding:8px 14px;font-size:11px;font-weight:700;color:var(--navy);display:flex;justify-content:space-between;align-items:center;letter-spacing:.02em}
+.pip-row{display:grid;grid-template-columns:1fr 90px 90px 90px 30px;gap:6px;padding:5px 12px;border-bottom:1px solid #F5F0EA;align-items:center}
+.pip-row:last-child{border-bottom:none}
+.pip-row-label{font-size:12px;color:var(--navy)}
+.pip-input{border:1px solid var(--border);border-radius:5px;padding:4px 7px;font-size:12px;font-weight:600;color:var(--navy);background:#fff;text-align:right;outline:none}
+.pip-input:focus{border-color:var(--accent)}
+.pip-total{font-size:12px;font-weight:700;color:var(--navy);text-align:right;padding:0 7px}
+.pip-subtotal{background:#F7F3EE;padding:7px 12px;display:grid;grid-template-columns:1fr 90px;gap:6px;font-size:12px;font-weight:700;color:var(--navy);border-top:1px solid var(--border)}
+/* PARAMETROS */
+.param-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.param-row{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid #F5F0EA}
+.param-row:last-child{border-bottom:none}
+.param-label{font-size:12px;color:#444}
+.param-pct{display:flex;align-items:center;gap:4px}
+.param-pct input{width:60px;text-align:right}
+/* RESULTADO */
+.res-waterfall{background:#fff;border-radius:10px;border:1px solid var(--border);overflow:hidden}
+.res-row{display:flex;justify-content:space-between;align-items:center;padding:9px 16px;border-bottom:1px solid #F5F0EA;font-size:13px}
+.res-row:last-child{border-bottom:none}
+.res-row.subtotal{background:#F7F3EE;font-weight:700;color:var(--navy)}
+.res-row.total{background:var(--navy);color:#fff;font-weight:700;font-size:15px}
+.res-row.total .res-val{color:var(--gold)}
+.res-row.section{background:#F0EAE2;font-size:10px;font-weight:700;color:#666;letter-spacing:.08em;text-transform:uppercase;padding:5px 16px}
+.res-label{color:inherit}
+.res-val{font-weight:700;text-align:right}
+.res-pct{font-size:10px;color:#999;margin-left:8px}
+/* PROYECTOS */
+.proj-card{border:1px solid var(--border);border-radius:10px;padding:13px 15px;background:#fff;cursor:pointer;transition:all .15s;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.proj-card:hover{border-color:var(--accent);box-shadow:0 2px 10px rgba(184,92,56,.12)}
+/* RUBROS TABLA */
+.rt-grid{display:grid;grid-template-columns:28px 1fr 120px 75px 75px 1fr 26px;gap:6px;align-items:center}
+.rt-head{font-size:9px;font-weight:700;color:#999;letter-spacing:.08em;text-transform:uppercase;padding:6px 0 5px;border-bottom:1px solid #F0EAE2}
+.rt-row{padding:5px 0;border-bottom:1px solid #FAF5F0}
+.rt-inp{border:1px solid transparent;border-radius:4px;padding:3px 5px;font-size:11px;color:var(--navy);background:transparent;outline:none;width:100%}
+.rt-inp:focus{border-color:#DDD4C8;background:#FDFAF7}
+.rt-num{border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:12px;font-weight:700;color:var(--navy);outline:none;width:100%;text-align:right;background:#FDFAF7}
+/* MISC */
+.spinner{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:40px 20px;color:#999}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.gap-8{gap:8px} .gap-10{gap:10px} .gap-12{gap:12px}
+.mb-12{margin-bottom:12px} .mb-16{margin-bottom:16px} .mt-10{margin-top:10px} .mt-14{margin-top:14px}
+.flex{display:flex} .flex-between{display:flex;justify-content:space-between;align-items:center}
+.warn-box{background:#FFFBF0;border:1px solid rgba(201,150,58,.35);border-radius:9px;padding:12px 15px}
+.info-box{background:#F0F4F8;border:1px solid #C5D5E8;border-radius:9px;padding:12px 15px}
+.tag{background:#F0EBE3;color:var(--navy);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:500;display:inline-block;margin:2px}
+.ref-tag{background:#fff;border:1px solid var(--gold);color:#7A5C1E;border-radius:20px;padding:2px 9px;font-size:10px;display:inline-block;margin:2px}
+.section-label{font-size:9px;font-weight:700;color:#999;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.mood-box{background:linear-gradient(135deg,rgba(27,42,59,.04),rgba(184,92,56,.06));border-radius:7px;padding:8px 11px;border-left:3px solid var(--accent);font-size:12px;color:#444;font-style:italic}
+.color-swatch{display:flex;align-items:center;gap:5px;background:#F7F3EE;border-radius:5px;padding:2px 7px}
+.swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.1);flex-shrink:0}
+#toast{position:fixed;bottom:20px;right:20px;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;z-index:9999;opacity:0;transform:translateY(6px);transition:all .25s;pointer-events:none;color:#fff;background:var(--navy)}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.error{background:var(--red)}
+#toast.success{background:var(--green)}
+hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+small{font-size:10px;color:#999}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">🏗</div>
+    <div class="auth-title">Stand Estimator</div>
+    <div class="auth-sub">DALI Arquitectura 360°</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="setAuthTab('login')">Ingresar</button>
+      <button class="auth-tab" onclick="setAuthTab('register')">Registrarse</button>
+    </div>
+    <div id="auth-login">
+      <div class="mb-12"><label class="field-label">Email</label><input type="email" id="login-email" placeholder="tu@email.com" /></div>
+      <div class="mb-16"><label class="field-label">Contraseña</label><input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()" id="btn-login">Ingresar</button>
+    </div>
+    <div id="auth-register" style="display:none">
+      <div class="mb-12"><label class="field-label">Nombre completo</label><input type="text" id="reg-name" placeholder="Juan Pérez" /></div>
+      <div class="mb-12"><label class="field-label">Email</label><input type="email" id="reg-email" placeholder="tu@email.com" /></div>
+      <div class="mb-16"><label class="field-label">Contraseña</label><input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" /></div>
+      <button class="btn btn-primary btn-full" onclick="doRegister()" id="btn-register">Crear cuenta</button>
+    </div>
+    <div id="auth-error" style="display:none;margin-top:12px;background:#FFF0EE;border:1px solid #F8C5BC;border-radius:7px;padding:8px 12px;color:var(--red);font-size:12px"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="logo-wrap">
+      <div class="logo-icon">🏗</div>
+      <div><div class="logo-text">STAND ESTIMATOR</div><div class="logo-sub">DALI Arquitectura 360°</div></div>
+    </div>
+    <nav>
+      <button class="active" onclick="showView('pip')" id="nav-pip">✦ Nuevo PIP</button>
+      <button onclick="showView('proyectos')" id="nav-proyectos">📁 Proyectos</button>
+      <button onclick="showView('precios')" id="nav-precios">📋 Precios base</button>
+      <button onclick="showView('parametros')" id="nav-parametros">⚙ Parámetros</button>
+      <button onclick="showView('equipo')" id="nav-equipo">👥 Equipo</button>
+    </nav>
+    <div class="user-area">
+      <div class="avatar" id="user-avatar">?</div>
+      <span class="user-name" id="user-name-display">—</span>
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ══ PIP / NUEVO PROYECTO ══ -->
+    <div id="view-pip">
+      <div id="pip-result" style="display:none"></div>
+      <div id="pip-form">
+
+        <!-- DATOS DEL PROYECTO -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Nuevo proyecto · PIP</h2>
+            <small id="params-summary" style="color:#666">Cargando parámetros...</small>
+          </div>
+          <div class="card-body">
+            <div class="grid-2 mb-12" style="gap:14px">
+              <div><label class="field-label">Nombre del proyecto *</label><input type="text" id="pip-nombre" placeholder="Ej: Stand Novozymes — Expoagro 2026" /></div>
+              <div><label class="field-label">Cliente</label><input type="text" id="pip-cliente" placeholder="Nombre del cliente" /></div>
+            </div>
+            <div class="grid-3 mb-12" style="gap:14px">
+              <div><label class="field-label">M² lote</label><input type="number" id="pip-m2" placeholder="36" /></div>
+              <div><label class="field-label">Frente (m)</label><input type="number" id="pip-frente" placeholder="6" /></div>
+              <div><label class="field-label">Profundidad (m)</label><input type="number" id="pip-fondo" placeholder="6" /></div>
+            </div>
+            <div class="grid-2 mb-12" style="gap:14px">
+              <div>
+                <label class="field-label">Tipología</label>
+                <select id="pip-tipo">
+                  <option value="isla">Isla (4 lados libres)</option>
+                  <option value="peninsula">Península (3 lados libres)</option>
+                  <option value="esquina">Esquina (2 lados libres)</option>
+                  <option value="entre3">Entre 3 medianeras</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Pauta presupuestaria del cliente</label>
+                <input type="number" id="pip-pauta" placeholder="Opcional — tope del cliente" />
+              </div>
+            </div>
+            <div>
+              <label class="field-label">Brief (texto libre)</label>
+              <textarea id="pip-brief" rows="3" placeholder="Descripción del evento, marca, objetivos, estilo, competidores..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ARCHIVOS -->
+        <div class="card">
+          <div class="card-header"><h3>Documentación del cliente</h3></div>
+          <div class="card-body">
+            <div class="grid-3">
+              <div class="dropzone" id="dz-brief" ondragover="dzOver(event,'dz-brief')" ondragleave="dzOut('dz-brief')" ondrop="dzDrop(event,'brief')" onclick="document.getElementById('file-brief').click()">
+                <input type="file" id="file-brief" style="display:none" accept=".pdf,.jpg,.jpeg,.png" onchange="dzFile(this,'brief')">
+                <div style="font-size:22px">📄</div>
+                <div style="font-weight:600;color:var(--navy);font-size:12px" id="dz-brief-label">Brief del cliente</div>
+                <div style="font-size:10px;color:#999" id="dz-brief-sub">PDF o imagen</div>
+              </div>
+              <div class="dropzone" id="dz-planta" ondragover="dzOver(event,'dz-planta')" ondragleave="dzOut('dz-planta')" ondrop="dzDrop(event,'planta')" onclick="document.getElementById('file-planta').click()">
+                <input type="file" id="file-planta" style="display:none" accept=".pdf,.jpg,.jpeg,.png" onchange="dzFile(this,'planta')">
+                <div style="font-size:22px">📐</div>
+                <div style="font-weight:600;color:var(--navy);font-size:12px" id="dz-planta-label">Planta del stand</div>
+                <div style="font-size:10px;color:#999" id="dz-planta-sub">PDF o imagen</div>
+              </div>
+              <div class="dropzone" id="dz-render" ondragover="dzOver(event,'dz-render')" ondragleave="dzOut('dz-render')" ondrop="dzDrop(event,'render')" onclick="document.getElementById('file-render').click()">
+                <input type="file" id="file-render" style="display:none" accept=".jpg,.jpeg,.png,.pdf" onchange="dzFile(this,'render')">
+                <div style="font-size:22px">🖼</div>
+                <div style="font-weight:600;color:var(--navy);font-size:12px" id="dz-render-label">Render de referencia</div>
+                <div style="font-size:10px;color:#999" id="dz-render-sub">Imagen</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PIP MANUAL / EDITABLE -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Costos directos — Costo Variable A</h3>
+            <div class="flex gap-8">
+              <span id="pip-cv-a-badge" style="font-weight:700;color:var(--accent);font-size:13px">$ 0</span>
+              <button class="btn btn-sm btn-secondary" onclick="autoFillFromAI()" id="btn-autofill">✦ Completar con IA</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="rt-grid rt-head" style="padding:6px 12px 5px">
+              <div></div><div>Ítem</div><div>Cantidad</div><div>$ Unit.</div><div>$ Total</div><div>Notas / Proveedor</div><div></div>
+            </div>
+            <div id="pip-rubros-a"></div>
+            <div style="padding:8px 12px">
+              <button class="btn btn-secondary btn-sm" style="border:1.5px dashed #DDD4C8;background:none;color:#888;font-size:11px" onclick="addRubroA()">+ ítem</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CV B -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Costos indirectos — Costo Variable B</h3>
+            <span id="pip-cv-b-badge" style="font-weight:700;color:var(--accent);font-size:13px">$ 0</span>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div id="pip-rubros-b"></div>
+            <div style="padding:8px 12px">
+              <button class="btn btn-secondary btn-sm" style="border:1.5px dashed #DDD4C8;background:none;color:#888;font-size:11px" onclick="addRubroB()">+ ítem</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GENERATE -->
+        <button class="btn btn-primary btn-full" id="btn-generate" onclick="generatePIP()" style="margin-bottom:14px">
+          ✦ Calcular precio de venta y propuestas de diseño
+        </button>
+        <div id="gen-error" style="display:none" class="warn-box mb-12"></div>
+      </div>
+    </div>
+
+    <!-- ══ PROYECTOS ══ -->
+    <div id="view-proyectos" style="display:none">
+      <div class="flex-between mb-16">
+        <h2 style="font-family:'Georgia',serif;color:var(--navy);font-size:20px">Proyectos del equipo</h2>
+        <button class="btn btn-primary" onclick="showView('pip')">+ Nuevo PIP</button>
+      </div>
+      <div id="proyectos-list"><div class="empty-state"><span class="spinner">⟳</span></div></div>
+    </div>
+
+    <!-- ══ PRECIOS BASE ══ -->
+    <div id="view-precios" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Precios base de referencia</h2>
+            <small style="color:#666">Ítems y precios unitarios que se cargan al iniciar un nuevo PIP · Compartidos con el equipo</small>
+          </div>
+          <div class="flex gap-8" style="flex-wrap:wrap;align-items:center">
+            <div style="display:flex;align-items:center;gap:5px;background:#FFFBF0;border:1px solid rgba(201,150,58,.4);border-radius:7px;padding:5px 9px">
+              <span style="font-size:10px;color:#7A5C1E;font-weight:700">Actualizar</span>
+              <input type="number" id="inflacion-pct" placeholder="%" style="width:42px;padding:2px 5px;font-size:11px;text-align:center;border-radius:4px;border:1px solid #DDD4C8;background:#fff" />
+              <span style="font-size:10px;color:#7A5C1E">%</span>
+              <input type="text" id="inflacion-motivo" placeholder="motivo..." style="width:90px;padding:2px 6px;font-size:10px;border-radius:4px;border:1px solid #DDD4C8;background:#fff" />
+              <button class="btn btn-gold btn-sm" onclick="applyInflacion()">Aplicar</button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="savePrecios()" id="btn-save-precios">Guardar</button>
+          </div>
+        </div>
+        <div style="background:rgba(27,42,59,.03);border-bottom:1px solid #EDE5DC;padding:7px 18px;display:flex;gap:14px;align-items:center">
+          <span style="font-size:11px;color:#666">Rubros cargados:</span>
+          <span id="precios-count" style="font-weight:700;color:var(--navy);font-size:13px">—</span>
+        </div>
+        <!-- Tabs por rubro -->
+        <div style="padding:0">
+          <div style="display:flex;gap:2px;padding:8px 14px 0;border-bottom:1px solid var(--border);overflow-x:auto">
+            <button class="tab active" onclick="preciosTab('pisos',this)" style="flex:none;white-space:nowrap">🪵 Pisos</button>
+            <button class="tab" onclick="preciosTab('constructor',this)" style="flex:none;white-space:nowrap">🏗 Constructor</button>
+            <button class="tab" onclick="preciosTab('vidrios',this)" style="flex:none;white-space:nowrap">🪟 Vidrios</button>
+            <button class="tab" onclick="preciosTab('electricidad',this)" style="flex:none;white-space:nowrap">💡 Elect./Ilum.</button>
+            <button class="tab" onclick="preciosTab('grafica',this)" style="flex:none;white-space:nowrap">🖨 Gráfica</button>
+            <button class="tab" onclick="preciosTab('equipamiento',this)" style="flex:none;white-space:nowrap">🪑 Mobiliario</button>
+            <button class="tab" onclick="preciosTab('audiovisual',this)" style="flex:none;white-space:nowrap">📺 AV/Tech</button>
+            <button class="tab" onclick="preciosTab('otros',this)" style="flex:none;white-space:nowrap">📦 Otros</button>
+            <button class="tab" onclick="preciosTab('indirectos',this)" style="flex:none;white-space:nowrap">📋 CV-B</button>
+          </div>
+          <div id="precios-content" class="card-body"></div>
+        </div>
+      </div>
+      <!-- Historial -->
+      <div class="card">
+        <div class="card-header"><h3>Historial de actualizaciones de precios</h3></div>
+        <div class="card-body" id="historial-list"><div class="empty-state"><span class="spinner">⟳</span></div></div>
+      </div>
+    </div>
+
+    <!-- ══ PARÁMETROS ══ -->
+    <div id="view-parametros" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <h2>Parámetros financieros</h2>
+          <button class="btn btn-primary btn-sm" onclick="saveParametros()" id="btn-save-params">Guardar</button>
+        </div>
+        <div class="card-body">
+          <p style="font-size:12px;color:#666;margin-bottom:16px">Estos valores se aplican automáticamente al calcular el precio de venta en cada PIP. Compartidos con el equipo.</p>
+          <div class="grid-2" style="gap:20px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px;letter-spacing:.02em">MÁRGENES Y GASTOS</div>
+              <div id="params-form-a"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:10px;letter-spacing:.02em">IMPUESTOS Y FINANCIEROS</div>
+              <div id="params-form-b"></div>
+            </div>
+          </div>
+          <hr>
+          <div class="info-box mt-10">
+            <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🧮 Fórmula de precio de venta</div>
+            <div style="font-size:11px;color:#444;line-height:1.8">
+              Costo A + Costo B = <strong>Costo Total</strong><br>
+              + Gastos Administrativos (% sobre costo) → <strong>Subtotal admin</strong><br>
+              + Margen (% sobre costo) → <strong>Subtotal margen</strong><br>
+              + IIBB + Ganancias + Sello + Débito/Crédito → <strong>Subtotal impuestos</strong><br>
+              + Costo Financiero → <strong>Subtotal financiero</strong><br>
+              + Comisión Agencia (si aplica) → <strong>PRECIO DE VENTA + IVA 21%</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ EQUIPO ══ -->
+    <div id="view-equipo" style="display:none">
+      <div class="card">
+        <div class="card-header"><h2>Miembros del equipo</h2></div>
+        <div class="card-body" id="equipo-list"><div class="empty-state"><span class="spinner">⟳</span></div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://wmhhkksmomrfzxmblzwx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtaGhra3Ntb21yZnp4bWJsend4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MTc5MTEsImV4cCI6MjA5NzE5MzkxMX0.bvavn2RwK21Y5m0KmfDqeB4TWPUYN0CMs4bt8p54EmY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let parametros = {};
+let preciosCatalog = {};
+let currentPreciosTab = 'pisos';
+let uploadedFiles = {brief:null, planta:null, render:null};
+let pipRubrosA = [];
+let pipRubrosB = [];
+
+// Parámetros por defecto (% como decimales)
+const DEFAULT_PARAMS = {
+  margen_seguridad: 0.02,
+  costo_admin: 0.05,
+  margen: 0.10,
+  iibb: 0.035,
+  ganancias: 0.037,
+  sello: 0.008,
+  debcred: 0.0098,
+  costo_financiero: 0.02,
+  comision_agencia: 0.00,
+  iva: 0.21,
+};
+
+const PARAM_LABELS = {
+  margen_seguridad: 'Margen de seguridad',
+  costo_admin: 'Gastos Administrativos',
+  margen: 'Margen de ganancia',
+  iibb: 'Ingresos Brutos',
+  ganancias: 'Impuesto a las Ganancias',
+  sello: 'Impuesto de Sello',
+  debcred: 'Gastos Déb/Cré Bancario',
+  costo_financiero: 'Costo Financiero',
+  comision_agencia: 'Comisión Agencia',
+  iva: 'IVA',
+};
+
+// Catálogo inicial de precios base (extraído del PIP)
+const DEFAULT_CATALOG = {
+  pisos: [
+    {id:'p1', label:'Tarima + alfombra usada', unit:'m²', precio:29},
+    {id:'p2', label:'Tarima + melamina nueva (entera)', unit:'m²', precio:75},
+    {id:'p3', label:'Tarima + melamina nueva (baldosas)', unit:'m²', precio:65},
+    {id:'p4', label:'Solo alfombra nueva', unit:'m²', precio:20},
+    {id:'p5', label:'Solo alfombra usada', unit:'m²', precio:18},
+    {id:'p6', label:'Perfil perimetral para alfombra', unit:'m lineal', precio:27.5},
+    {id:'p7', label:'Solo colocación', unit:'m²', precio:8.5},
+    {id:'p8', label:'Deck de madera nuevo', unit:'m²', precio:70},
+    {id:'p9', label:'Deck de madera usado', unit:'m²', precio:53},
+  ],
+  constructor: [
+    {id:'c1', label:'Constructor (tarima 4mm, melamina blanca)', unit:'global', precio:43300},
+    {id:'c2', label:'Estructura metálica modular', unit:'m²', precio:280},
+    {id:'c3', label:'Carpintería especial / MDF laqueado', unit:'m²', precio:350},
+    {id:'c4', label:'Tabique divisorio melamina', unit:'m²', precio:120},
+  ],
+  vidrios: [
+    {id:'v1', label:'Vidrio transparente 6mm', unit:'m²', precio:70},
+    {id:'v2', label:'Vidrio transparente 3+3', unit:'m²', precio:150},
+    {id:'v3', label:'Acrílico transparente 5mm', unit:'m²', precio:210},
+    {id:'v4', label:'Acrílico transparente 3mm', unit:'m²', precio:125},
+    {id:'v5', label:'Vidrio esmerilado 4mm', unit:'m²', precio:60},
+    {id:'v6', label:'Vidrio esmerilado 6mm', unit:'m²', precio:80},
+    {id:'v7', label:'Baldosas de vidrio', unit:'m²', precio:280},
+  ],
+  electricidad: [
+    {id:'e1', label:'Tablero eléctrico', unit:'u', precio:103},
+    {id:'e2', label:'Toma corriente', unit:'u', precio:12},
+    {id:'e3', label:'Spot AR111', unit:'u', precio:40},
+    {id:'e4', label:'Cuarzo con brazo', unit:'u', precio:33},
+    {id:'e5', label:'Cuarzo 300w', unit:'u', precio:35},
+    {id:'e6', label:'Tubo fluorescente 20-40w', unit:'u', precio:10},
+    {id:'e7', label:'Spot incandescente 100w exterior', unit:'u', precio:12.5},
+    {id:'e8', label:'Spot incandescente 100w embutido', unit:'u', precio:8.75},
+    {id:'e9', label:'LED tiras (m lineal)', unit:'m', precio:22},
+    {id:'e10', label:'Toma para aire acondicionado', unit:'u', precio:500},
+    {id:'e11', label:'Flete electricidad', unit:'global', precio:150},
+  ],
+  grafica: [
+    {id:'g1', label:'Vinilo impreso troquelado', unit:'m²', precio:150},
+    {id:'g2', label:'Vinilo impreso', unit:'m²', precio:125},
+    {id:'g3', label:'Lona impresa gran formato', unit:'m²', precio:90},
+    {id:'g4', label:'Flete gráfica', unit:'global', precio:150},
+  ],
+  equipamiento: [
+    {id:'m1', label:'Silla Lisi plástica', unit:'u', precio:15},
+    {id:'m2', label:'Silla alta 159', unit:'u', precio:72},
+    {id:'m3', label:'Taburete JB blanco', unit:'u', precio:60},
+    {id:'m4', label:'Puff base cromada', unit:'u', precio:75},
+    {id:'m5', label:'Mesa ratona 50×30cm', unit:'u', precio:80},
+    {id:'m6', label:'Mesa alta 1.00m pie pintado', unit:'u', precio:55},
+    {id:'m7', label:'Mesa alta 1.00m pie cromado', unit:'u', precio:60},
+    {id:'m8', label:'Mesa reunión 1.60×0.80', unit:'u', precio:72},
+    {id:'m9', label:'Sillón Le Corbusier 1 cuerpo', unit:'u', precio:150},
+    {id:'m10', label:'Sillón Le Corbusier 2 cuerpos', unit:'u', precio:300},
+    {id:'m11', label:'Sillón Le Corbusier 3 cuerpos', unit:'u', precio:450},
+    {id:'m12', label:'Sillón Barcelona 1 cuerpo', unit:'u', precio:300},
+    {id:'m13', label:'Mostrador vitrina recto 1.00/1.20m', unit:'u', precio:75},
+    {id:'m14', label:'Vitrina de pie 50×50×1.80m', unit:'u', precio:120},
+    {id:'m15', label:'Heladera alta', unit:'u', precio:320},
+    {id:'m16', label:'Frigobar/heladera baja', unit:'u', precio:160},
+    {id:'m17', label:'Matafuego triclase', unit:'u', precio:35},
+    {id:'m18', label:'Portafolletos aluminio', unit:'u', precio:90},
+    {id:'m19', label:'Estantería metálica 30×90cm', unit:'u', precio:52},
+  ],
+  audiovisual: [
+    {id:'av1', label:'Plasma 42" DVD + audio', unit:'u', precio:500},
+    {id:'av2', label:'Plasma 50" DVD + audio', unit:'u', precio:850},
+    {id:'av3', label:'Plasma 63" DVD + audio', unit:'u', precio:2300},
+    {id:'av4', label:'LCD 32" alta resolución', unit:'u', precio:480},
+    {id:'av5', label:'Laptop', unit:'u', precio:450},
+    {id:'av6', label:'Computadora c/ monitor 17"', unit:'u', precio:240},
+    {id:'av7', label:'Proyector', unit:'u', precio:1000},
+  ],
+  otros: [
+    {id:'o1', label:'Limpieza de obra m² (mínimo $150)', unit:'m²', precio:150},
+    {id:'o2', label:'Ignifugado (mínimo $150)', unit:'m²', precio:150},
+    {id:'o3', label:'Servicio de telefonía', unit:'global', precio:1200},
+    {id:'o4', label:'Internet (La Rural)', unit:'global', precio:1200},
+    {id:'o5', label:'Instalación agua y desagüe', unit:'global', precio:400},
+    {id:'o6', label:'Servicio agua y desagüe', unit:'global', precio:800},
+    {id:'o7', label:'Fotografías', unit:'u', precio:50},
+    {id:'o8', label:'Plantas decorativas', unit:'u', precio:75},
+  ],
+  indirectos: [
+    {id:'b1', label:'Viáticos', unit:'global', precio:0},
+    {id:'b2', label:'Dirección de obra', unit:'global', precio:0},
+    {id:'b3', label:'Pasajes y combustibles', unit:'global', precio:0},
+    {id:'b4', label:'Hospedaje', unit:'global', precio:0},
+    {id:'b5', label:'Varios e imprevistos estimado', unit:'%', precio:0},
+    {id:'b6', label:'Encomienda profesional', unit:'global', precio:0},
+    {id:'b7', label:'Calculista', unit:'global', precio:0},
+  ],
+};
+
+// ════════ INIT ════════
+window.addEventListener('DOMContentLoaded', async () => {
+  const {data:{session}} = await sb.auth.getSession();
+  if (session) await initApp(session.user);
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event==='SIGNED_IN' && session) await initApp(session.user);
+    if (event==='SIGNED_OUT') showAuth();
+  });
+});
+
+async function initApp(user) {
+  currentUser = user;
+  const {data:profile} = await sb.from('profiles').select('*').eq('id',user.id).single();
+  const initials = (profile?.full_name||user.email||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name-display').textContent = profile?.full_name||user.email;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  await Promise.all([loadParametros(), loadCatalog()]);
+  initPIPRubros();
+  showView('pip');
+}
+function showAuth() {
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+
+// ════════ AUTH ════════
+function setAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase().includes(tab==='login'?'ingresar':'registr')));
+  document.getElementById('auth-login').style.display = tab==='login'?'':'none';
+  document.getElementById('auth-register').style.display = tab==='register'?'':'none';
+  document.getElementById('auth-error').style.display='none';
+}
+async function doLogin() {
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  if(!email||!pass) return showAuthError('Completá email y contraseña');
+  const btn=document.getElementById('btn-login'); btn.disabled=true; btn.textContent='Ingresando...';
+  const {error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){showAuthError(error.message); btn.disabled=false; btn.textContent='Ingresar';}
+}
+async function doRegister() {
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  if(!name||!email||!pass) return showAuthError('Completá todos los campos');
+  if(pass.length<6) return showAuthError('Mínimo 6 caracteres');
+  const btn=document.getElementById('btn-register'); btn.disabled=true; btn.textContent='Creando...';
+  const {error}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name}}});
+  if(error){showAuthError(error.message); btn.disabled=false; btn.textContent='Crear cuenta';}
+  else { document.getElementById('auth-error').style.cssText='display:block;background:#E8F5EE;border:1px solid #A8D5B8;border-radius:7px;padding:8px 12px;color:var(--green);font-size:12px;margin-top:12px'; document.getElementById('auth-error').textContent='✓ Revisá tu email para confirmar'; btn.disabled=false; btn.textContent='Crear cuenta'; }
+}
+async function doLogout(){await sb.auth.signOut();}
+function showAuthError(msg){const el=document.getElementById('auth-error');el.textContent=msg;el.style.display='';}
+
+// ════════ VIEWS ════════
+const VIEWS=['pip','proyectos','precios','parametros','equipo'];
+async function showView(v) {
+  VIEWS.forEach(id=>{
+    document.getElementById('view-'+id).style.display=id===v?'':'none';
+    const nav=document.getElementById('nav-'+id);
+    if(nav) nav.classList.toggle('active',id===v);
+  });
+  if(v==='proyectos') await loadProyectos();
+  if(v==='precios'){renderPreciosTab(currentPreciosTab); await loadHistorial();}
+  if(v==='parametros') renderParamsForm();
+  if(v==='equipo') await loadEquipo();
+}
+
+// ════════ PARÁMETROS ════════
+async function loadParametros() {
+  const {data}=await sb.from('config').select('*').eq('key','parametros').single();
+  parametros = data ? {...DEFAULT_PARAMS,...JSON.parse(data.value)} : {...DEFAULT_PARAMS};
+  updateParamsSummary();
+}
+async function saveParametros() {
+  const fields = document.querySelectorAll('[data-param]');
+  fields.forEach(f=>{ parametros[f.dataset.param]=parseFloat(f.value)/100||0; });
+  await sb.from('config').upsert({key:'parametros',value:JSON.stringify(parametros),updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'key'});
+  updateParamsSummary();
+  toast('✓ Parámetros guardados','success');
+}
+function updateParamsSummary() {
+  const el=document.getElementById('params-summary');
+  if(el) el.textContent=`Margen ${(parametros.margen*100).toFixed(1)}% · Admin ${(parametros.costo_admin*100).toFixed(1)}% · IVA ${(parametros.iva*100).toFixed(0)}%`;
+}
+function renderParamsForm() {
+  const groupA=['margen_seguridad','costo_admin','margen','comision_agencia'];
+  const groupB=['iibb','ganancias','sello','debcred','costo_financiero','iva'];
+  const renderGroup=(keys,containerId)=>{
+    document.getElementById(containerId).innerHTML=keys.map(k=>`
+      <div class="param-row">
+        <label class="param-label">${PARAM_LABELS[k]}</label>
+        <div class="param-pct">
+          <input type="number" data-param="${k}" value="${(parametros[k]*100).toFixed(2)}" step="0.01" style="width:65px;text-align:right" />
+          <span style="font-size:12px;color:#888">%</span>
+        </div>
+      </div>`).join('');
+  };
+  renderGroup(groupA,'params-form-a');
+  renderGroup(groupB,'params-form-b');
+}
+
+// ════════ CATÁLOGO DE PRECIOS ════════
+async function loadCatalog() {
+  const {data}=await sb.from('config').select('*').eq('key','catalogo').single();
+  preciosCatalog = data ? JSON.parse(data.value) : JSON.parse(JSON.stringify(DEFAULT_CATALOG));
+  document.getElementById('precios-count').textContent=Object.values(preciosCatalog).flat().length+' ítems';
+}
+async function savePrecios() {
+  await sb.from('config').upsert({key:'catalogo',value:JSON.stringify(preciosCatalog),updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'key'});
+  document.getElementById('precios-count').textContent=Object.values(preciosCatalog).flat().length+' ítems';
+  toast('✓ Precios guardados','success');
+}
+function preciosTab(tab,btn) {
+  currentPreciosTab=tab;
+  document.querySelectorAll('#view-precios .tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPreciosTab(tab);
+}
+function renderPreciosTab(tab) {
+  const items=preciosCatalog[tab]||[];
+  const cont=document.getElementById('precios-content');
+  cont.innerHTML=`
+    <div class="rt-grid rt-head">
+      <div></div><div>Descripción del ítem</div><div>Unidad</div><div colspan="2">Precio unit.</div><div>Notas</div><div></div>
+    </div>
+    ${items.map((it,i)=>`
+      <div class="rt-grid rt-row" data-tab="${tab}" data-idx="${i}">
+        <span style="font-size:14px;text-align:center">·</span>
+        <input class="rt-inp" style="font-size:12px;font-weight:600" value="${escHtml(it.label)}" onchange="updateCatalogItem('${tab}',${i},'label',this.value)" />
+        <input class="rt-inp" value="${escHtml(it.unit)}" style="font-size:11px" onchange="updateCatalogItem('${tab}',${i},'unit',this.value)" />
+        <input type="number" class="rt-num" value="${it.precio}" onchange="updateCatalogItem('${tab}',${i},'precio',parseFloat(this.value)||0)" style="grid-column:span 2" />
+        <input class="rt-inp" value="${escHtml(it.notas||'')}" placeholder="notas..." style="font-size:11px" onchange="updateCatalogItem('${tab}',${i},'notas',this.value)" />
+        <button class="btn btn-sm" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:15px;padding:0" onmouseenter="this.style.color='#C0392B'" onmouseleave="this.style.color='#ccc'" onclick="deleteCatalogItem('${tab}',${i})">×</button>
+      </div>`).join('')}
+    <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" style="border:1.5px dashed #DDD4C8;background:none;color:#888;font-size:11px" onclick="addCatalogItem('${tab}')">+ ítem</button></div>`;
+}
+function updateCatalogItem(tab,i,field,val){preciosCatalog[tab][i][field]=val;}
+function deleteCatalogItem(tab,i){preciosCatalog[tab].splice(i,1);renderPreciosTab(tab);}
+function addCatalogItem(tab){
+  preciosCatalog[tab].push({id:'new_'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0,notas:''});
+  renderPreciosTab(tab);
+}
+async function applyInflacion() {
+  const pct=parseFloat(document.getElementById('inflacion-pct').value);
+  const motivo=document.getElementById('inflacion-motivo').value.trim()||`+${pct}%`;
+  if(isNaN(pct)||pct===0) return toast('Ingresá un porcentaje válido','error');
+  const factor=1+pct/100;
+  Object.keys(preciosCatalog).forEach(tab=>{
+    preciosCatalog[tab].forEach(it=>{ it.precio=Math.round(it.precio*factor*100)/100; });
+  });
+  await savePrecios();
+  // Guardar historial
+  try {
+    await sb.from('rubros_historial').insert({
+      rubro_id:null, usd_m2_anterior:0, usd_m2_nuevo:pct,
+      motivo:`Catálogo actualizado ${pct>0?'+':''}${pct}% — ${motivo}`,
+      changed_by:currentUser.id
+    });
+  } catch(e){}
+  document.getElementById('inflacion-pct').value='';
+  document.getElementById('inflacion-motivo').value='';
+  renderPreciosTab(currentPreciosTab);
+  toast(`✓ Todos los precios actualizados ${pct>0?'+':''}${pct}%`,'success');
+  await loadHistorial();
+}
+async function loadHistorial() {
+  const {data}=await sb.from('rubros_historial').select('*,changed_by_profile:profiles(full_name)').order('changed_at',{ascending:false}).limit(15);
+  const el=document.getElementById('historial-list');
+  if(!el) return;
+  if(!data||data.length===0){el.innerHTML='<div class="empty-state">Sin historial</div>';return;}
+  el.innerHTML=data.map(h=>{
+    const fecha=new Date(h.changed_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #F5F0EA;font-size:12px">
+      <span style="color:var(--navy);font-weight:600">${escHtml(h.motivo||'—')}</span>
+      <span style="color:#999;font-size:10px">${fecha} · ${h.changed_by_profile?.full_name||'?'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ════════ PIP — RUBROS ════════
+const RUBRO_SECTIONS_A = [
+  {key:'pisos',     label:'🪵 Pisos'},
+  {key:'constructor',label:'🏗 Constructor / Arquitectura'},
+  {key:'vidrios',   label:'🪟 Vidrios'},
+  {key:'electricidad',label:'💡 Electricidad e iluminación'},
+  {key:'grafica',   label:'🖨 Gráfica'},
+  {key:'equipamiento',label:'🪑 Equipamiento / Mobiliario'},
+  {key:'audiovisual',label:'📺 Audio y video'},
+  {key:'otros',     label:'📦 Otros / Servicios'},
+];
+
+function initPIPRubros() {
+  pipRubrosA=[];
+  pipRubrosB=[];
+  // Init CV-A desde catálogo (sin cantidades)
+  RUBRO_SECTIONS_A.forEach(sec=>{
+    (preciosCatalog[sec.key]||[]).forEach(it=>{
+      pipRubrosA.push({section:sec.key,sectionLabel:sec.label,id:it.id||('r'+Math.random()),label:it.label,unit:it.unit,precio:it.precio,cant:0,notas:''});
+    });
+  });
+  // CV-B
+  (preciosCatalog.indirectos||DEFAULT_CATALOG.indirectos).forEach(it=>{
+    pipRubrosB.push({id:it.id||('b'+Math.random()),label:it.label,unit:it.unit,precio:it.precio,cant:1,notas:''});
+  });
+  renderPIPRubrosA();
+  renderPIPRubrosB();
+}
+
+function renderPIPRubrosA() {
+  const cont=document.getElementById('pip-rubros-a');
+  const sections={};
+  pipRubrosA.forEach((r,i)=>{
+    if(!sections[r.section]) sections[r.section]={label:r.sectionLabel,items:[]};
+    sections[r.section].items.push({...r,idx:i});
+  });
+  let html='';
+  Object.values(sections).forEach(sec=>{
+    const total=sec.items.reduce((s,r)=>(s+(r.cant*r.precio)),0);
+    html+=`<div style="border-bottom:1px solid #F0EAE2">
+      <div class="pip-section-header">${sec.label}<span style="color:var(--accent);font-weight:700">$ ${fmt(total)}</span></div>`;
+    sec.items.forEach(r=>{
+      const tot=r.cant*r.precio;
+      html+=`<div class="rt-grid rt-row" style="padding:4px 12px">
+        <span style="font-size:14px;text-align:center;color:#ccc">·</span>
+        <span style="font-size:11px;color:var(--navy)">${escHtml(r.label)} <span style="color:#999;font-size:10px">(${r.unit})</span></span>
+        <input type="number" class="rt-num" placeholder="0" value="${r.cant||''}" oninput="updatePipA(${r.idx},'cant',parseFloat(this.value)||0)" style="font-size:12px" />
+        <input type="number" class="rt-num" value="${r.precio}" oninput="updatePipA(${r.idx},'precio',parseFloat(this.value)||0)" style="font-size:12px" />
+        <span class="pip-total" style="font-size:12px">${tot>0?'$ '+fmt(tot):''}</span>
+        <input class="rt-inp" value="${escHtml(r.notas)}" placeholder="proveedor / nota..." oninput="updatePipA(${r.idx},'notas',this.value)" style="font-size:10px" />
+        <button style="background:none;border:none;cursor:pointer;color:#ddd;font-size:14px" onmouseenter="this.style.color='#C0392B'" onmouseleave="this.style.color='#ddd'" onclick="removePipA(${r.idx})">×</button>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  cont.innerHTML=html;
+  updateCVTotals();
+}
+
+function renderPIPRubrosB() {
+  const cont=document.getElementById('pip-rubros-b');
+  let html='';
+  pipRubrosB.forEach((r,i)=>{
+    const tot=r.cant*r.precio;
+    html+=`<div class="rt-grid rt-row" style="padding:4px 12px">
+      <span style="font-size:14px;text-align:center;color:#ccc">·</span>
+      <span style="font-size:11px;color:var(--navy)">${escHtml(r.label)}</span>
+      <input type="number" class="rt-num" placeholder="1" value="${r.cant||''}" oninput="updatePipB(${i},'cant',parseFloat(this.value)||0)" style="font-size:12px" />
+      <input type="number" class="rt-num" value="${r.precio}" oninput="updatePipB(${i},'precio',parseFloat(this.value)||0)" style="font-size:12px" />
+      <span class="pip-total">${tot>0?'$ '+fmt(tot):''}</span>
+      <input class="rt-inp" value="${escHtml(r.notas)}" placeholder="nota..." oninput="updatePipB(${i},'notas',this.value)" style="font-size:10px" />
+      <button style="background:none;border:none;cursor:pointer;color:#ddd;font-size:14px" onmouseenter="this.style.color='#C0392B'" onmouseleave="this.style.color='#ddd'" onclick="removePipB(${i})">×</button>
+    </div>`;
+  });
+  cont.innerHTML=html;
+  updateCVTotals();
+}
+
+function updatePipA(idx,field,val){pipRubrosA[idx][field]=val;renderPIPRubrosA();}
+function updatePipB(idx,field,val){pipRubrosB[idx][field]=val;renderPIPRubrosB();}
+function removePipA(idx){pipRubrosA.splice(idx,1);renderPIPRubrosA();}
+function removePipB(idx){pipRubrosB.splice(idx,1);renderPIPRubrosB();}
+
+function addRubroA(){
+  pipRubrosA.push({section:'otros',sectionLabel:'📦 Otros / Servicios',id:'new'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0,cant:0,notas:''});
+  renderPIPRubrosA();
+}
+function addRubroB(){
+  pipRubrosB.push({id:'new'+Date.now(),label:'Nuevo ítem',unit:'global',precio:0,cant:1,notas:''});
+  renderPIPRubrosB();
+}
+
+function getCVA(){return pipRubrosA.reduce((s,r)=>s+(r.cant*r.precio),0);}
+function getCVB(){return pipRubrosB.reduce((s,r)=>s+(r.cant*r.precio),0);}
+
+function updateCVTotals(){
+  document.getElementById('pip-cv-a-badge').textContent='$ '+fmt(getCVA());
+  document.getElementById('pip-cv-b-badge').textContent='$ '+fmt(getCVB());
+}
+
+// ════════ CÁLCULO PRECIO DE VENTA (lógica PIP) ════════
+function calcPrecioVenta(cvA, cvB, params) {
+  const costoTotal = cvA + cvB;
+
+  // Admin y margen aplicados sobre el COSTO (como recargo)
+  const gastoAdmin = costoTotal * params.costo_admin;
+  const margen = costoTotal * params.margen;
+  const subtotalAnteImp = costoTotal + gastoAdmin + margen;
+
+  // Impuestos aplicados en cascada (método del PIP original)
+  // El PIP usa coeficientes sobre facturación, se resuelven como % sobre precio
+  // Solución algebraica: precio = (costoTotal + admin + margen) / (1 - %imp - %fin)
+  const pctImp = params.iibb + params.ganancias + params.sello + params.debcred;
+  const pctFin = params.costo_financiero;
+  const subtotalImpFin = (subtotalAnteImp) / (1 - pctImp - pctFin);
+
+  const impuestos = subtotalImpFin - subtotalAnteImp;
+  const costoFin = subtotalImpFin * params.costo_financiero;
+  const precioSinComision = subtotalImpFin;
+
+  // Comisión agencia
+  const comisionAgencia = precioSinComision * params.comision_agencia;
+  const precioNeto = precioSinComision + comisionAgencia;
+
+  // IVA
+  const iva = precioNeto * params.iva;
+  const precioTotal = precioNeto + iva;
+
+  // Margen bruto
+  const contribucionMarginal = precioNeto - costoTotal;
+  const pctContribMarginal = contribucionMarginal / precioNeto;
+  const utilidadNeta = margen;
+  const pctUtilidadNeta = utilidadNeta / precioNeto;
+  const markup = precioNeto / costoTotal;
+
+  return {
+    cvA, cvB, costoTotal,
+    gastoAdmin, margen,
+    subtotalAnteImp,
+    impuestos, costoFin,
+    comisionAgencia,
+    precioNeto,
+    iva, precioTotal,
+    contribucionMarginal, pctContribMarginal,
+    utilidadNeta, pctUtilidadNeta,
+    markup,
+  };
+}
+
+// ════════ AUTO-FILL CON IA ════════
+async function autoFillFromAI() {
+  const brief = document.getElementById('pip-brief').value.trim();
+  const m2 = document.getElementById('pip-m2').value;
+  const tipo = document.getElementById('pip-tipo').value;
+  if(!brief && !m2) return toast('Ingresá brief o superficie para que la IA pueda sugerir cantidades','error');
+
+  const btn = document.getElementById('btn-autofill');
+  btn.disabled=true; btn.innerHTML='<span class="spinner">⟳</span> Analizando...';
+
+  try {
+    const catalogResumen = Object.entries(preciosCatalog).map(([sec,items])=>
+      `${sec}: ${items.map(it=>`${it.id}=${it.label}(${it.unit},$${it.precio})`).join('; ')}`
+    ).join('\n');
+
+    const prompt = `Sos un experto en producción de stands para exposiciones en Argentina.
+Dado este proyecto:
+- Superficie: ${m2||'?'} m² · Tipología: ${tipo}
+- Brief: ${brief||'stand de exposición estándar'}
+
+Del siguiente catálogo de ítems, sugerí las CANTIDADES para cada ítem que corresponda usar.
+Solo incluí ítems con cantidad > 0.
+
+CATÁLOGO (id=descripción(unidad,$precio)):
+${catalogResumen}
+
+Respondé ÚNICAMENTE con JSON:
+{"sugerencias":[{"id":"p1","cant":36,"nota":"alfombra para todo el piso"},{"id":"c1","cant":1,"nota":"estructura completa"},...]}
+No incluyas ítems con cant=0. Solo los necesarios para este stand.`;
+
+    const resp = await fetch('/api/estimate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:[{role:'user',content:[{type:'text',text:prompt}]}],rubros:[],sqm:m2,brief,tipo,mode:'autofill'})
+    });
+    if(!resp.ok) throw new Error('API error '+resp.status);
+    const data = await resp.json();
+    const raw = data.text||'{}';
+    const clean = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    if(parsed.sugerencias) {
+      parsed.sugerencias.forEach(s=>{
+        const idx=pipRubrosA.findIndex(r=>r.id===s.id);
+        if(idx>=0){ pipRubrosA[idx].cant=s.cant; if(s.nota) pipRubrosA[idx].notas=s.nota; }
+      });
+      renderPIPRubrosA();
+      toast(`✓ IA sugirió ${parsed.sugerencias.length} ítems`,'success');
+    }
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  btn.disabled=false; btn.innerHTML='✦ Completar con IA';
+}
+
+// ════════ GENERAR PIP COMPLETO ════════
+async function generatePIP() {
+  const nombre = document.getElementById('pip-nombre').value.trim();
+  if(!nombre) return toast('Ingresá un nombre para el proyecto','error');
+
+  const cvA = getCVA();
+  const cvB = getCVB();
+  if(cvA+cvB===0) return toast('Cargá al menos un ítem con cantidad y precio','error');
+
+  const btn=document.getElementById('btn-generate');
+  btn.disabled=true;
+  const steps=['Calculando precio de venta...','Generando propuestas de diseño...','Armando presentación...'];
+  let si=0; const si_int=setInterval(()=>{btn.innerHTML=`<span class="spinner">⟳</span> ${steps[si++%steps.length]}`;},2000);
+
+  document.getElementById('gen-error').style.display='none';
+
+  try {
+    const calc = calcPrecioVenta(cvA, cvB, parametros);
+    const brief = document.getElementById('pip-brief').value.trim();
+    const m2 = document.getElementById('pip-m2').value;
+    const cliente = document.getElementById('pip-cliente').value.trim();
+    const pauta = document.getElementById('pip-pauta').value;
+    const tipo = document.getElementById('pip-tipo').options[document.getElementById('pip-tipo').selectedIndex].text;
+
+    // Pedir solo propuestas de diseño a Claude (el cálculo ya lo hicimos)
+    const userContent=[];
+    if(brief) userContent.push({type:'text',text:`BRIEF:\n${brief}`});
+    for(const type of ['brief','planta','render']){
+      const file=uploadedFiles[type];
+      if(!file) continue;
+      const b64=await fileToBase64(file);
+      userContent.push({type:'text',text:{brief:'BRIEF ARCHIVO:',planta:'PLANTA:',render:'RENDER REFERENCIA:'}[type]});
+      if(file.type.startsWith('image/')) userContent.push({type:'image',source:{type:'base64',media_type:file.type,data:b64}});
+      else if(file.type==='application/pdf') userContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}});
+    }
+
+    const designPrompt = `Stand para ${cliente||'el cliente'}, ${m2||'?'} m², tipología: ${tipo}.
+Brief: ${brief||'stand de exposición'}
+${pauta?'Pauta presupuestaria del cliente: $'+pauta:''}
+
+Generá DOS propuestas de diseño conceptual para este stand.
+Respondé ÚNICAMENTE JSON sin markdown:
+{"propuestas":[
+  {"name":"nombre creativo","concept":"concepto en 5 palabras",
+   "palette":[{"hex":"#XXXXXX","name":"nombre"}],
+   "materials":["material1","material2","material3"],
+   "spatial":"descripción espacial 2-3 oraciones",
+   "features":["elemento1","elemento2","elemento3","elemento4"],
+   "references":["referencia1","referencia2","referencia3"],
+   "mood":"frase del espíritu de la propuesta"},
+  {...segunda propuesta...}
+]}`;
+
+    userContent.push({type:'text',text:designPrompt});
+
+    const resp=await fetch('/api/estimate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:[{role:'user',content:userContent}],rubros:[],sqm:m2,mode:'design'})
+    });
+    if(!resp.ok) throw new Error('API error '+resp.status);
+    const data=await resp.json();
+    const raw=data.text||'{}';
+    const clean=raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const diseño=JSON.parse(clean);
+
+    // Armar resultado completo
+    const resultado={
+      nombre, cliente, m2, tipo, pauta, brief,
+      calc, params:parametros,
+      rubrosA:pipRubrosA.filter(r=>r.cant>0),
+      rubrosB:pipRubrosB.filter(r=>r.cant*r.precio>0),
+      propuestas:diseño.propuestas||[]
+    };
+
+    // Guardar en Supabase
+    const {data:saved}=await sb.from('proyectos').insert({
+      nombre, cliente, brief_texto:brief, superficie_m2:m2||null,
+      resultado, created_by:currentUser.id
+    }).select().single();
+
+    clearInterval(si_int);
+    renderPIPResult(resultado);
+  } catch(e){
+    clearInterval(si_int);
+    const errEl=document.getElementById('gen-error');
+    errEl.textContent='⚠ '+e.message; errEl.style.display='';
+    toast(e.message,'error');
+  }
+  btn.disabled=false; btn.textContent='✦ Calcular precio de venta y propuestas de diseño';
+}
+
+// ════════ RENDER RESULTADO ════════
+function renderPIPResult(res) {
+  document.getElementById('pip-form').style.display='none';
+  const rv=document.getElementById('pip-result');
+  rv.style.display='';
+  const c=res.calc;
+  const p=res.params;
+  const m2=parseFloat(res.m2)||1;
+  const pautaOk = res.pauta && parseFloat(res.pauta)>0;
+  const pautaColor = pautaOk ? (c.precioNeto<=parseFloat(res.pauta)?'var(--green)':'var(--red)') : '';
+  const pautaLabel = pautaOk ? (c.precioNeto<=parseFloat(res.pauta)?'✓ Dentro de pauta':'⚠ Sobre pauta') : '';
+
+  rv.innerHTML=`
+    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-secondary" onclick="resetPIP()">← Nuevo proyecto</button>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary" onclick="showView('proyectos')">Ver todos</button>
+        <button class="btn btn-gold" onclick="window.print()">🖨 Imprimir</button>
+      </div>
+    </div>
+
+    <!-- SUMMARY BAR -->
+    <div class="summary-bar">
+      <div style="flex:1;min-width:160px">
+        <div class="stat-label">Proyecto</div>
+        <div style="color:#fff;font-weight:700;font-size:15px;font-family:'Georgia',serif;margin-top:2px">${escHtml(res.nombre)}</div>
+        ${res.cliente?`<div style="color:#A0B4C8;font-size:11px">${escHtml(res.cliente)}</div>`:''}
+        ${res.tipo?`<div style="color:#A0B4C8;font-size:11px">${res.tipo} · ${res.m2} m²</div>`:''}
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+        <div class="summary-stat"><div class="stat-label">Costo A+B</div><div class="stat-value" style="font-size:14px">$ ${fmt(c.costoTotal)}</div></div>
+        <div class="summary-stat"><div class="stat-label">Precio venta neto</div><div class="stat-value gold">$ ${fmt(c.precioNeto)}</div></div>
+        <div class="summary-stat"><div class="stat-label">Total c/ IVA</div><div class="stat-value">$ ${fmt(c.precioTotal)}</div></div>
+        <div class="summary-stat"><div class="stat-label">$/m²</div><div class="stat-value" style="font-size:14px">$ ${fmt(c.precioNeto/m2)}</div></div>
+        ${pautaOk?`<div class="summary-stat"><div class="stat-label">Pauta cliente</div><div style="font-weight:700;font-size:14px;color:${pautaColor}">${pautaLabel}</div></div>`:''}
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs" id="res-tabs">
+      <button class="tab active" onclick="resTab('precio',this)">💰 Precio de venta</button>
+      <button class="tab" onclick="resTab('rubros',this)">📋 Rubros utilizados</button>
+      <button class="tab" onclick="resTab('propuestas',this)">✦ Propuestas de diseño</button>
+    </div>
+
+    <!-- TAB PRECIO -->
+    <div id="res-precio">
+      <div class="grid-2" style="gap:14px">
+        <!-- WATERFALL -->
+        <div>
+          <div class="card" style="margin-bottom:0">
+            <div class="card-header"><h3>Cascada de precio de venta</h3></div>
+            <div class="res-waterfall">
+              <div class="res-row section">COSTOS DIRECTOS E INDIRECTOS</div>
+              <div class="res-row"><span class="res-label">Costo Variable A (producción)</span><span class="res-val">$ ${fmt(c.cvA)}</span></div>
+              <div class="res-row"><span class="res-label">Costo Variable B (indirectos)</span><span class="res-val">$ ${fmt(c.cvB)}</span></div>
+              <div class="res-row subtotal"><span>COSTO TOTAL A + B</span><span class="res-val">$ ${fmt(c.costoTotal)}</span></div>
+
+              <div class="res-row section">GASTOS Y MARGEN</div>
+              <div class="res-row"><span class="res-label">Gastos Administrativos (${pct(p.costo_admin)})</span><span class="res-val">$ ${fmt(c.gastoAdmin)}</span></div>
+              <div class="res-row"><span class="res-label">Margen de ganancia (${pct(p.margen)})</span><span class="res-val">$ ${fmt(c.margen)}</span></div>
+              <div class="res-row subtotal"><span>Subtotal antes de impuestos</span><span class="res-val">$ ${fmt(c.subtotalAnteImp)}</span></div>
+
+              <div class="res-row section">IMPUESTOS Y FINANCIERO</div>
+              <div class="res-row"><span class="res-label">IIBB + Ganancias + Sello + Déb/Créd</span><span class="res-val res-pct">${pct(p.iibb+p.ganancias+p.sello+p.debcred)}</span><span class="res-val">$ ${fmt(c.impuestos)}</span></div>
+              <div class="res-row"><span class="res-label">Costo Financiero (${pct(p.costo_financiero)})</span><span class="res-val">$ ${fmt(c.costoFin)}</span></div>
+              ${c.comisionAgencia>0?`<div class="res-row"><span class="res-label">Comisión Agencia (${pct(p.comision_agencia)})</span><span class="res-val">$ ${fmt(c.comisionAgencia)}</span></div>`:''}
+
+              <div class="res-row subtotal"><span>PRECIO NETO (sin IVA)</span><span class="res-val">$ ${fmt(c.precioNeto)}</span></div>
+              <div class="res-row"><span class="res-label">IVA 21%</span><span class="res-val">$ ${fmt(c.iva)}</span></div>
+              <div class="res-row total"><span class="res-label">PRECIO TOTAL + IVA</span><span class="res-val">$ ${fmt(c.precioTotal)}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MÉTRICAS -->
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-header"><h3>Indicadores de rentabilidad</h3></div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                ${metricBox('Contribución Marginal','$ '+fmt(c.contribucionMarginal),'#2C5F8A')}
+                ${metricBox('% Contrib. Marginal',(c.pctContribMarginal*100).toFixed(1)+'%',c.pctContribMarginal>=0.25?'var(--green)':'var(--red)')}
+                ${metricBox('Utilidad Neta','$ '+fmt(c.utilidadNeta),'var(--green)')}
+                ${metricBox('% Utilidad Neta',(c.pctUtilidadNeta*100).toFixed(1)+'%',c.pctUtilidadNeta>=0.08?'var(--green)':'var(--red)')}
+                ${metricBox('Precio / m²','$ '+fmt(c.precioNeto/m2),'var(--navy)')}
+                ${metricBox('Markup',c.markup.toFixed(2)+'x',c.markup>=1.3?'var(--green)':'var(--red)')}
+              </div>
+              ${pautaOk?`
+              <div style="background:${c.precioNeto<=parseFloat(res.pauta)?'#E8F5EE':'#FFF0EE'};border:1px solid ${c.precioNeto<=parseFloat(res.pauta)?'#A8D5B8':'#F8C5BC'};border-radius:8px;padding:10px 13px">
+                <div style="font-size:11px;font-weight:700;color:${c.precioNeto<=parseFloat(res.pauta)?'var(--green)':'var(--red)'}">Pauta del cliente: $ ${fmt(parseFloat(res.pauta))}</div>
+                <div style="font-size:11px;color:#555;margin-top:3px">${c.precioNeto<=parseFloat(res.pauta)?'✓ El precio está dentro de la pauta presupuestaria.':'⚠ El precio supera la pauta en $ '+fmt(c.precioNeto-parseFloat(res.pauta))+'. Revisar rubros o margen.'}</div>
+              </div>`:''}
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="card-header"><h3>Resumen por rubro</h3></div>
+            <div class="card-body" style="padding:8px 14px">
+              ${Object.entries(res.rubrosA.reduce((acc,r)=>{acc[r.section]=(acc[r.section]||0)+(r.cant*r.precio);return acc;},{})).map(([sec,tot])=>`
+                <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F5F0EA;font-size:12px">
+                  <span style="color:#444">${RUBRO_SECTIONS_A.find(s=>s.key===sec)?.label||sec}</span>
+                  <span style="font-weight:700;color:var(--navy)">$ ${fmt(tot)}</span>
+                </div>`).join('')}
+              ${c.cvB>0?`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px"><span style="color:#444">📋 Costos indirectos (CV-B)</span><span style="font-weight:700;color:var(--navy)">$ ${fmt(c.cvB)}</span></div>`:''}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB RUBROS -->
+    <div id="res-rubros" style="display:none">
+      <div class="card">
+        <div class="card-header"><h3>Detalle de rubros — Costo Variable A</h3><span style="font-weight:700;color:var(--accent)">$ ${fmt(c.cvA)}</span></div>
+        <div style="padding:0 18px">
+          ${res.rubrosA.map(r=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F5F0EA;gap:10px">
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600;color:var(--navy)">${escHtml(r.label)}</div>
+                ${r.notas?`<div style="font-size:10px;color:#888">${escHtml(r.notas)}</div>`:''}
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-size:11px;color:#888">${r.cant} ${r.unit} × $ ${fmt(r.precio)}</div>
+                <div style="font-size:13px;font-weight:700;color:var(--navy)">$ ${fmt(r.cant*r.precio)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      ${res.rubrosB.length?`
+      <div class="card">
+        <div class="card-header"><h3>Costos indirectos — Costo Variable B</h3><span style="font-weight:700;color:var(--accent)">$ ${fmt(c.cvB)}</span></div>
+        <div style="padding:0 18px">
+          ${res.rubrosB.map(r=>`
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F5F0EA;font-size:12px">
+              <span style="color:var(--navy);font-weight:600">${escHtml(r.label)}</span>
+              <span style="font-weight:700">$ ${fmt(r.cant*r.precio)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`:''}
+    </div>
+
+    <!-- TAB PROPUESTAS -->
+    <div id="res-propuestas" style="display:none">
+      <div class="grid-2" style="gap:14px">
+        ${(res.propuestas||[]).map((p,i)=>renderProposal(p,i)).join('')}
+      </div>
+    </div>`;
+}
+
+function metricBox(label,val,color){
+  return `<div style="background:#F7F3EE;border-radius:8px;padding:10px 12px;border-left:3px solid ${color}">
+    <div style="font-size:10px;color:#888;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px">${label}</div>
+    <div style="font-size:16px;font-weight:700;color:${color}">${val}</div>
+  </div>`;
+}
+
+function renderProposal(p,i){
+  return `<div class="card" style="margin-bottom:0">
+    <div style="background:var(--navy);padding:12px 16px;display:flex;align-items:center;gap:10px">
+      <div style="background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">${i+1}</div>
+      <div><div style="color:#fff;font-weight:700;font-size:14px;font-family:'Georgia',serif">${escHtml(p.name||'Propuesta '+(i+1))}</div><div style="color:#A0B4C8;font-size:11px">${escHtml(p.concept||'')}</div></div>
+    </div>
+    <div style="padding:14px 16px">
+      ${p.palette?.length?`<div class="mb-12"><div class="section-label">Paleta</div><div style="display:flex;flex-wrap:wrap;gap:5px">${p.palette.map(c=>`<div class="color-swatch"><div class="swatch" style="background:${c.hex}"></div><span style="font-size:11px;color:var(--navy);font-weight:600">${c.name}</span></div>`).join('')}</div></div>`:''}
+      ${p.materials?.length?`<div class="mb-12"><div class="section-label">Materialidades</div><div>${p.materials.map(m=>`<span class="tag">${m}</span>`).join('')}</div></div>`:''}
+      ${p.spatial?`<div class="mb-12"><div class="section-label">Concepto espacial</div><p style="font-size:12px;color:#444;line-height:1.6">${escHtml(p.spatial)}</p></div>`:''}
+      ${p.features?.length?`<div class="mb-12"><div class="section-label">Elementos clave</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${p.features.map(f=>`<div style="background:#FDFAF7;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--navy)">✦ ${f}</div>`).join('')}</div></div>`:''}
+      ${p.references?.length?`<div class="mb-12"><div class="section-label">Referencias</div><div>${p.references.map(r=>`<span class="ref-tag">${r}</span>`).join('')}</div></div>`:''}
+      ${p.mood?`<div class="mood-box">"${escHtml(p.mood)}"</div>`:''}
+    </div>
+  </div>`;
+}
+
+function resTab(id,btn){
+  ['precio','rubros','propuestas'].forEach(t=>document.getElementById('res-'+t).style.display=t===id?'':'none');
+  document.querySelectorAll('#res-tabs .tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function resetPIP(){
+  document.getElementById('pip-result').style.display='none';
+  document.getElementById('pip-form').style.display='';
+  uploadedFiles={brief:null,planta:null,render:null};
+  ['brief','planta','render'].forEach(t=>{
+    const dz=document.getElementById('dz-'+t);
+    dz.classList.remove('has-file','over');
+    document.getElementById('dz-'+t+'-label').textContent={brief:'Brief del cliente',planta:'Planta del stand',render:'Render de referencia'}[t];
+    document.getElementById('dz-'+t+'-sub').textContent=t==='render'?'Imagen':'PDF o imagen';
+  });
+  initPIPRubros();
+}
+
+// ════════ PROYECTOS ════════
+async function loadProyectos(){
+  const {data}=await sb.from('proyectos').select('*,created_by_profile:profiles(full_name)').order('created_at',{ascending:false});
+  const el=document.getElementById('proyectos-list');
+  if(!data||data.length===0){el.innerHTML='<div class="empty-state"><div style="font-size:32px;margin-bottom:8px">📁</div>Sin proyectos todavía</div>';return;}
+  const estados={borrador:'badge-muted',enviado:'badge-gold',aprobado:'badge-green',rechazado:'badge-red'};
+  el.innerHTML=data.map(p=>{
+    const c=p.resultado?.calc;
+    const fecha=new Date(p.created_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    return `<div class="proj-card" onclick="openProyecto('${p.id}')">
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--navy);font-size:14px">${escHtml(p.nombre)}</div>
+        <div style="font-size:11px;color:#888;margin-top:3px">${p.cliente?`<strong>${escHtml(p.cliente)}</strong> · `:''} ${p.superficie_m2?p.superficie_m2+' m² · ':''} ${fecha} · ${p.created_by_profile?.full_name||'—'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        ${c?`<div style="font-weight:700;color:var(--navy);font-size:14px">$ ${fmt(c.precioNeto)}</div>
+             <div style="font-size:10px;color:#888">$ ${fmt(c.precioNeto/(parseFloat(p.superficie_m2)||1))}/m²</div>`:''}
+        <div style="margin-top:5px"><span class="badge ${estados[p.estado]||'badge-muted'}">${p.estado||'borrador'}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+const _projCache={};
+async function openProyecto(id){
+  if(!_projCache[id]){const{data}=await sb.from('proyectos').select('*').eq('id',id).single();_projCache[id]=data;}
+  const p=_projCache[id];
+  if(!p?.resultado) return toast('Sin resultado','error');
+  showView('pip');
+  renderPIPResult(p.resultado);
+}
+
+// ════════ EQUIPO ════════
+async function loadEquipo(){
+  const{data}=await sb.from('profiles').select('*').order('created_at');
+  const el=document.getElementById('equipo-list');
+  if(!data||data.length===0){el.innerHTML='<div class="empty-state">Sin miembros</div>';return;}
+  el.innerHTML=data.map(p=>{
+    const initials=(p.full_name||p.email||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div class="avatar" style="width:34px;height:34px;font-size:12px">${initials}</div>
+      <div style="flex:1"><div style="font-weight:700;color:var(--navy);font-size:13px">${escHtml(p.full_name||'—')} ${p.id===currentUser?.id?'<span class="badge badge-muted" style="font-size:9px">vos</span>':''}</div><div style="font-size:11px;color:#888">${escHtml(p.email||'')}</div></div>
+      <span class="badge ${p.role==='admin'?'badge-accent':'badge-muted'}">${p.role||'member'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ════════ DROPZONE ════════
+function dzOver(e,id){e.preventDefault();document.getElementById(id).classList.add('over');}
+function dzOut(id){document.getElementById(id).classList.remove('over');}
+function dzDrop(e,type){e.preventDefault();dzOut('dz-'+type);const f=e.dataTransfer.files[0];if(f)setFile(type,f);}
+function dzFile(input,type){if(input.files[0])setFile(type,input.files[0]);}
+function setFile(type,file){
+  uploadedFiles[type]=file;
+  const dz=document.getElementById('dz-'+type);
+  dz.classList.add('has-file');dz.classList.remove('over');
+  document.getElementById('dz-'+type+'-label').textContent=file.name;
+  document.getElementById('dz-'+type+'-sub').textContent=(file.size/1024).toFixed(0)+' KB';
+}
+function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('Error'));r.readAsDataURL(file);});}
+
+// ════════ UTILS ════════
+function fmt(n){return Math.round(n||0).toLocaleString('es-AR');}
+function pct(n){return (n*100).toFixed(2)+'%';}
+function escHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='show'+(type?' '+type:'');
+  setTimeout(()=>{el.className='';},3000);
+}
+</script>
+</body>
+</html>
