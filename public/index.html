@@ -318,19 +318,23 @@ small{font-size:10px;color:#999}
                   <input type="number" id="pip-cotizacion" placeholder="Ej: 1200" oninput="calcTC()" inputmode="numeric" />
                 </div>
                 <div>
-                  <label class="field-label">Margen seguridad cambiario (%)</label>
+                  <label class="field-label">Cobertura cambiaria (%)</label>
                   <input type="number" id="pip-mg-cambio" value="2" oninput="calcTC()" inputmode="numeric" />
+                  <div style="font-size:10px;color:#888;margin-top:4px">⚠ Reduce el TC para cobrar más <span id="tc-sym2">USD</span> y cubrirte ante una suba del dólar</div>
                 </div>
               </div>
-              <div style="background:#F7F3EE;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
-                <div>
-                  <div style="font-size:12px;font-weight:700;color:var(--navy)">Tipo de cambio final</div>
-                  <div style="font-size:10px;color:#888;margin-top:2px">Cotización × (1 − mg. seguridad)</div>
+              <div style="background:#F7F3EE;border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:var(--navy)">TC final (conservador)</div>
+                    <div style="font-size:10px;color:#888;margin-top:1px">Cotización × (1 − cobertura%)</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:11px;color:#888">1 <span id="tc-sym">USD</span> =</div>
+                    <div id="tc-final-display" style="font-size:18px;font-weight:700;color:var(--navy)">$ —</div>
+                  </div>
                 </div>
-                <div style="text-align:right">
-                  <div style="font-size:11px;color:#888">1 <span id="tc-sym">USD</span> =</div>
-                  <div id="tc-final-display" style="font-size:18px;font-weight:700;color:var(--navy)">$ —</div>
-                </div>
+                <div id="tc-ejemplo" style="font-size:10px;color:#666;background:#fff;border-radius:5px;padding:5px 8px;border:1px solid #EDE5DC"></div>
               </div>
             </div>
           </div>
@@ -628,7 +632,18 @@ function calcTC(){
   const tcEl=document.getElementById('tc-final-display');
   if(tcEl) tcEl.textContent=cot>0?'$ '+fmt(monedaConfig.tcFinal):'$ —';
   const badge=document.getElementById('tc-final-badge');
-  if(badge) badge.textContent=cot>0?`TC: $ ${fmt(monedaConfig.tcFinal)}`:(MONEDAS[mon]?.label||mon);
+  if(badge) badge.textContent=cot>0?'TC: $ '+fmt(monedaConfig.tcFinal):(MONEDAS[mon]?.label||mon);
+  // Actualizar sym2
+  const sym2=document.getElementById('tc-sym2');
+  if(sym2) sym2.textContent=mon;
+  // Mostrar ejemplo ilustrativo
+  const ej=document.getElementById('tc-ejemplo');
+  if(ej&&cot>0){
+    const ejARS=1000000;
+    const sinMg=Math.round(ejARS/cot);
+    const conMg=Math.round(ejARS/monedaConfig.tcFinal);
+    ej.innerHTML='Ej: $ '+fmt(ejARS)+' ARS &nbsp;→&nbsp; sin cobertura: <strong>'+mon+' '+fmt(sinMg)+'</strong> &nbsp;·&nbsp; con cobertura '+mg+'%: <strong style="color:var(--green)">'+mon+' '+fmt(conMg)+'</strong> (+'+fmt(conMg-sinMg)+')';
+  }
 }
 
 // Convierte monto en ARS → moneda de venta
