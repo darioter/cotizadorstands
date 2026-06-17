@@ -434,8 +434,8 @@ small{font-size:10px;color:#999}
               <input type="text" id="inflacion-motivo" placeholder="motivo" style="width:70px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid #DDD4C8;background:#fff" />
               <button class="btn btn-gold btn-sm" onclick="applyInflacion()">↑</button>
             </div>
-            <button class="btn btn-sm" style="background:#F0EAE2;color:#666;font-size:11px" onclick="resetCatalogDefault()" title="Recargar catálogo por defecto">↺ Default</button>
-            <button class="btn btn-primary btn-sm" onclick="savePrecios()" id="btn-save-precios">Guardar</button>
+            <button class="btn btn-sm" style="background:#F0EAE2;color:#666;font-size:11px" onclick="resetRubroDefault()" title="Resetear SOLO este rubro al listado por defecto">↺ Default rubro</button>
+            <button class="btn btn-primary btn-sm" onclick="savePrecios()" id="btn-save-precios">Guardar rubro</button>
           </div>
         </div>
         <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);-ms-overflow-style:none;scrollbar-width:none">
@@ -793,6 +793,7 @@ async function initApp(user){
   document.getElementById('app').style.display='flex';
   // Cargar config con fallback seguro
   await Promise.all([loadParametros(),loadCatalog()]);
+  await migrarCatalogoSiNecesario();
   initPIPRubros();
   showView('pip');
 }
@@ -878,21 +879,126 @@ function renderParamsForm(){
 }
 
 // ── CATÁLOGO ──
+// ── CATÁLOGO: lectura/escritura por rubro en tabla dedicada ──
+
 async function loadCatalog(){
+  preciosCatalog={};
+  // Inicializar con defaults primero
+  Object.keys(DEFAULT_CATALOG).forEach(k=>{
+    preciosCatalog[k]=JSON.parse(JSON.stringify(DEFAULT_CATALOG[k]));
+  });
   try{
-    const{data,error}=await sb.from('config').select('value').eq('key','catalogo').maybeSingle();
-    preciosCatalog=data?.value?JSON.parse(data.value):JSON.parse(JSON.stringify(DEFAULT_CATALOG));
-  }catch(e){ preciosCatalog=JSON.parse(JSON.stringify(DEFAULT_CATALOG)); }
-  // Asegurar que todas las secciones existan
+    const{data,error}=await sb.from('catalogo').select('*').eq('activo',true).order('orden');
+    if(data&&data.length>0){
+      // Agrupar por rubro — reemplaza el default de cada rubro que tenga datos
+      const byRubro={};
+      data.forEach(row=>{
+        if(!byRubro[row.rubro])byRubro[row.rubro]=[];
+        byRubro[row.rubro].push({id:row.id,label:row.label,unit:row.unit,precio:parseFloat(row.precio)||0});
+      });
+      // Solo reemplazar los rubros que tienen datos en Supabase
+      Object.keys(byRubro).forEach(rubro=>{
+        if(byRubro[rubro].length>0) preciosCatalog[rubro]=byRubro[rubro];
+      });
+    }
+  }catch(e){
+    console.warn('Tabla catalogo no existe aún, usando defaults',e.message);
+  }
   Object.keys(DEFAULT_CATALOG).forEach(k=>{if(!preciosCatalog[k])preciosCatalog[k]=[];});
 }
 
-async function resetCatalogDefault(){
-  if(!confirm('¿Resetear el catálogo al listado por defecto? Se perderán los cambios no guardados.')) return;
-  preciosCatalog=JSON.parse(JSON.stringify(DEFAULT_CATALOG));
-  await savePrecios();
-  renderPreciosTab(currentPreciosTab);
-  toast('✓ Catálogo reseteado al listado por defecto','success');
+async function savePrecios(){
+  const btn=document.getElementById('btn-save-precios');
+  if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+  try{
+    await saveRubro(currentPreciosTab);
+    toast('✓ Rubro guardado','success');
+    if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
+    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar';btn.disabled=false;}},2000);
+  }catch(e){
+    toast('Error: '+e.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='Guardar';}
+  }
+}
+
+async function saveRubro(rubro){
+  const items=preciosCatalog[rubro]||[];
+  // Upsert cada ítem del rubro
+  const rows=items.map((it,i)=>({
+    id:rubro+'_'+(it.id||i),
+    rubro,
+    label:it.label||'',
+    unit:it.unit||'u',
+    precio:it.precio||0,
+    activo:true,
+    orden:i,
+    updated_by:currentUser.id,
+    updated_at:new Date().toISOString()
+  }));
+
+  if(rows.length>0){
+    const{error}=await sb.from('catalogo').upsert(rows,{onConflict:'id'});
+    if(error)throw new Error(error.message);
+  }
+
+  // Desactivar (soft delete) los ítems del rubro que ya no están
+  const activeIds=rows.map(r=>r.id);
+  await sb.from('catalogo')
+    .update({activo:false,updated_at:new Date().toISOString()})
+    .eq('rubro',rubro)
+    .not('id','in','('+activeIds.map(id=>"'"+id+"'").join(',')+')');
+}
+
+async function resetRubroDefault(){
+  const rubro=currentPreciosTab;
+  const label={pisos:'Pisos',constructor:'Constructor',vidrios:'Vidrios',electricidad:'Electricidad',grafica:'Gráfica',equipamiento:'Mobiliario',audiovisual:'Audiovisual',otros:'Otros',indirectos:'CV-B'}[rubro]||rubro;
+  if(!confirm('¿Resetear el rubro "'+label+'" al listado por defecto? Los otros rubros no se tocan.'))return;
+  preciosCatalog[rubro]=JSON.parse(JSON.stringify(DEFAULT_CATALOG[rubro]||[]));
+  await saveRubro(rubro);
+  renderPreciosTab(rubro);
+  toast('✓ Rubro "'+label+'" reseteado','success');
+}
+
+async function migrarCatalogoSiNecesario(){
+  // Migrar una sola vez del config.catalogo JSON a tabla catalogo por ítems
+  try{
+    // Ver si la tabla catalogo ya tiene datos
+    const{data:existing}=await sb.from('catalogo').select('id').limit(1);
+    if(existing&&existing.length>0) return; // ya migrado
+
+    // Buscar catálogo viejo en config
+    const{data:oldConfig}=await sb.from('config').select('value').eq('key','catalogo').maybeSingle();
+    if(!oldConfig?.value) return; // nada que migrar
+
+    const oldCatalog=JSON.parse(oldConfig.value);
+    const rows=[];
+    Object.keys(oldCatalog).forEach(rubro=>{
+      (oldCatalog[rubro]||[]).forEach((it,i)=>{
+        rows.push({
+          id:rubro+'_'+(it.id||('item'+i)),
+          rubro,label:it.label||'',unit:it.unit||'u',
+          precio:it.precio||0,activo:true,orden:i,
+          updated_by:currentUser.id,updated_at:new Date().toISOString()
+        });
+      });
+    });
+    if(rows.length>0){
+      await sb.from('catalogo').upsert(rows,{onConflict:'id'});
+      // Actualizar preciosCatalog con los datos migrados
+      await loadCatalog();
+      toast('✓ Catálogo migrado correctamente ('+rows.length+' ítems)','success');
+    }
+  }catch(e){
+    console.warn('Migración no disponible:',e.message);
+  }
+}
+
+function markPreciosDirty(){
+  const btn=document.getElementById('btn-save-precios');
+  if(btn&&btn.textContent!=='Guardando...'&&btn.textContent!=='✓ Guardado'){
+    btn.style.background='var(--accent)';
+    btn.textContent='Guardar rubro ●';
+  }
 }
 async function savePrecios(){
   const btn=document.getElementById('btn-save-precios');
