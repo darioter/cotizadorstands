@@ -367,10 +367,7 @@ small{font-size:10px;color:#999}
         <div class="card">
           <div class="card-header">
             <h3>Costo Variable A — Producción</h3>
-            <div class="flex gap-6" style="align-items:center">
-              <span id="pip-cv-a-badge" style="font-weight:700;color:var(--accent);font-size:13px">$ 0</span>
-              <button class="btn btn-sm btn-secondary" onclick="autoFillFromAI()" id="btn-autofill">✦ IA</button>
-            </div>
+            <span id="pip-cv-a-badge" style="font-weight:700;color:var(--accent);font-size:13px">$ 0</span>
           </div>
           <div id="pip-rubros-a"></div>
           <div style="padding:8px 12px;border-top:1px solid var(--border)">
@@ -390,9 +387,24 @@ small{font-size:10px;color:#999}
           </div>
         </div>
 
-        <button class="btn btn-primary btn-full mb-12" id="btn-generate" onclick="generatePIP()">
-          ✦ Calcular precio de venta
-        </button>
+        <!-- PASO 1: Calcular (sin IA) -->
+        <div id="step-calcular">
+          <button class="btn btn-primary btn-full mb-12" id="btn-calcular" onclick="calcularPrecio()" style="font-size:15px;padding:15px">
+            🧮 Calcular precio de venta
+          </button>
+        </div>
+        <!-- PASO 2: Resultado inline + botón propuesta -->
+        <div id="step-resultado" style="display:none">
+          <!-- Resumen de precio calculado -->
+          <div id="calc-preview" class="card mb-12" style="border-left:4px solid var(--accent)"></div>
+          <!-- Botón propuesta IA -->
+          <button class="btn btn-full mb-12" id="btn-propuesta" onclick="generarPropuesta()" style="background:var(--navy);color:#fff;font-size:14px;padding:14px">
+            ✦ Generar propuesta estética con IA
+          </button>
+          <button class="btn btn-secondary btn-full mb-12" onclick="resetCalculo()" style="font-size:12px">
+            ← Volver a editar costos
+          </button>
+        </div>
         <div id="gen-error" style="display:none" class="warn-box mb-12"></div>
       </div>
     </div>
@@ -1244,55 +1256,167 @@ async function autoFillFromAI(){
   btn.disabled=false;btn.innerHTML='✦ IA';
 }
 
-// ── GENERAR PIP ──
-async function generatePIP(){
+// ── PASO 1: CALCULAR PRECIO (sin IA) ──
+let _calcSnapshot = null; // guarda el cálculo actual
+
+function calcularPrecio(){
   const nombre=document.getElementById('pip-nombre').value.trim();
-  if(!nombre)return toast('Ingresá un nombre','error');
-  const cvA=getCVA();const cvB=getCVB();
-  if(cvA+cvB===0)return toast('Cargá cantidades en al menos un ítem','error');
-  const btn=document.getElementById('btn-generate');
-  btn.disabled=true;
-  const steps=['Calculando precio...','Generando propuestas...','Preparando resultado...'];
-  let si=0;const si_int=setInterval(()=>{btn.innerHTML=`<span class="spinner">⟳</span> ${steps[si++%steps.length]}`;},2000);
+  if(!nombre)return toast('Ingresá un nombre para el proyecto','error');
+  const cvA=getCVA(); const cvB=getCVB();
+  if(cvA+cvB===0)return toast('Cargá al menos un ítem con cantidad y precio','error');
   document.getElementById('gen-error').style.display='none';
+
+  const calc=calcPrecioVenta(cvA,cvB,parametros);
+  const m2=parseFloat(document.getElementById('pip-m2').value)||1;
+  const pauta=document.getElementById('pip-pauta').value;
+  const pautaOk=pauta&&parseFloat(pauta)>0;
+  const enPauta=pautaOk&&calc.precioNeto<=parseFloat(pauta);
+
+  // Guardar snapshot
+  _calcSnapshot={
+    nombre,
+    cliente:document.getElementById('pip-cliente').value.trim(),
+    m2:document.getElementById('pip-m2').value,
+    tipo:document.getElementById('pip-tipo').options[document.getElementById('pip-tipo').selectedIndex].text,
+    pauta,
+    brief:document.getElementById('pip-brief').value.trim(),
+    calc,
+    params:parametros,
+    moneda:{...monedaConfig},
+    rubrosA:pipRubrosA.filter(r=>r.cant>0),
+    rubrosB:pipRubrosB.filter(r=>r.cant*r.precio>0),
+    propuestas:[]
+  };
+
+  // Mostrar preview compacto del precio
+  const preview=document.getElementById('calc-preview');
+  preview.innerHTML=
+    '<div style="padding:14px 16px">'
+    +'<div style="font-size:11px;font-weight:700;color:#888;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Precio calculado</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">'
+    +statBox('Costo A+B','$ '+fmt(calc.costoTotal),'#444')
+    +statBox('Precio neto','$ '+fmt(calc.precioNeto),'var(--accent)')
+    +statBox('Total + IVA','$ '+fmt(calc.precioTotal),'var(--navy)')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+    +statBox('Por m²','$ '+fmt(calc.precioNeto/m2),'var(--navy)')
+    +statBox('Margen neto',(calc.pctUtilidadNeta*100).toFixed(1)+'%',calc.pctUtilidadNeta>=0.08?'var(--green)':'var(--red)')
+    +statBox('Markup',calc.markup.toFixed(2)+'x',calc.markup>=1.3?'var(--green)':'var(--red)')
+    +'</div>'
+    +(pautaOk?'<div style="margin-top:10px;padding:8px 12px;border-radius:7px;background:'+(enPauta?'#E8F5EE':'#FFF0EE')+';font-size:12px;font-weight:700;color:'+(enPauta?'var(--green)':'var(--red)')+'">'+
+      (enPauta?'✓ Precio dentro de la pauta del cliente':'⚠ Supera la pauta en $ '+fmt(calc.precioNeto-parseFloat(pauta)))+'</div>':'')
+    +'</div>';
+
+  // Mostrar paso 2
+  document.getElementById('step-calcular').style.display='none';
+  document.getElementById('step-resultado').style.display='';
+
+  // Scroll al resultado
+  preview.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function statBox(label,val,color){
+  return '<div style="background:#F7F3EE;border-radius:7px;padding:8px 10px">'
+    +'<div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+label+'</div>'
+    +'<div style="font-size:14px;font-weight:700;color:'+color+'">'+val+'</div>'
+    +'</div>';
+}
+
+function resetCalculo(){
+  _calcSnapshot=null;
+  document.getElementById('step-calcular').style.display='';
+  document.getElementById('step-resultado').style.display='none';
+  document.getElementById('calc-preview').innerHTML='';
+}
+
+// ── PASO 2: GENERAR PROPUESTA ESTÉTICA CON IA ──
+async function generarPropuesta(){
+  if(!_calcSnapshot)return toast('Calculá el precio primero','error');
+  const btn=document.getElementById('btn-propuesta');
+  btn.disabled=true;
+  const steps=['Analizando brief y materialidades...','Diseñando propuestas...','Generando prompts de imagen...','Preparando documento final...'];
+  let si=0;
+  const si_int=setInterval(()=>{btn.innerHTML='<span class="spinner">⟳</span> '+steps[si++%steps.length];},2500);
+
   try{
-    const calc=calcPrecioVenta(cvA,cvB,parametros);
-    const brief=document.getElementById('pip-brief').value.trim();
-    const m2=document.getElementById('pip-m2').value;
-    const cliente=document.getElementById('pip-cliente').value.trim();
-    const pauta=document.getElementById('pip-pauta').value;
-    const tipo=document.getElementById('pip-tipo').options[document.getElementById('pip-tipo').selectedIndex].text;
-    // Capturar config moneda
-    const oferta=document.getElementById('pip-oferta').value;
-    monedaConfig.oferta=oferta;
-    const monedaSnap={...monedaConfig};
+    const res=_calcSnapshot;
     const userContent=[];
-    if(brief)userContent.push({type:'text',text:'BRIEF:\n'+brief});
+
+    // Adjuntar archivos si hay
     for(const type of ['brief','planta','render']){
       const file=uploadedFiles[type];if(!file)continue;
       const b64=await fileToBase64(file);
-      const lbl={brief:'BRIEF ARCHIVO:',planta:'PLANTA:',render:'RENDER:'}[type];
+      const lbl={brief:'BRIEF DEL CLIENTE:',planta:'PLANTA DEL STAND:',render:'RENDER DE REFERENCIA:'}[type];
       userContent.push({type:'text',text:lbl});
       if(file.type.startsWith('image/'))userContent.push({type:'image',source:{type:'base64',media_type:file.type,data:b64}});
       else if(file.type==='application/pdf')userContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}});
     }
-    userContent.push({type:'text',text:`Stand ${m2||'?'}m² ${tipo} para ${cliente||'el cliente'}. Brief: ${brief||'stand de exposición'}. Generá DOS propuestas de diseño. Respondé SOLO JSON sin markdown: {"propuestas":[{"name":"nombre","concept":"concepto 5 palabras","palette":[{"hex":"#XXXXX","name":"nombre"}],"materials":["m1","m2","m3"],"spatial":"descripción 2-3 oraciones","features":["f1","f2","f3","f4"],"references":["r1","r2"],"mood":"frase"},{"name":"...","concept":"...","palette":[],"materials":[],"spatial":"...","features":[],"references":[],"mood":"..."}]}`});
-    const resp=await fetch('/api/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:userContent}],mode:'design'})});
-    if(!resp.ok)throw new Error('API '+resp.status+(resp.status===401?' — verificá la ANTHROPIC_API_KEY en Vercel':''));
+
+    // Contexto del proyecto
+    const rubrosCtx=res.rubrosA.map(r=>r.label+' ('+r.cant+' '+r.unit+')').join(', ');
+    const ctx=`PROYECTO: ${res.nombre}
+CLIENTE: ${res.cliente||'—'}
+TIPOLOGÍA: ${res.tipo} | SUPERFICIE: ${res.m2||'?'} m²
+BRIEF: ${res.brief||'stand de exposición'}
+RUBROS INCLUIDOS: ${rubrosCtx}
+PRECIO NETO: $ ${fmt(res.calc.precioNeto)}`;
+
+    userContent.push({type:'text',text:ctx+`
+
+Generá DOS propuestas de diseño conceptual para este stand. Para cada propuesta incluí también DOS prompts detallados para generar imágenes con IA (Midjourney/DALL-E/Stable Diffusion) que muestren el stand desde distintos ángulos.
+
+Respondé SOLO JSON sin markdown:
+{
+  "propuestas": [
+    {
+      "name": "nombre creativo de la propuesta",
+      "concept": "concepto en 5 palabras",
+      "palette": [{"hex":"#XXXXXX","name":"nombre del color"}],
+      "materials": ["material1","material2","material3","material4"],
+      "spatial": "descripción del concepto espacial en 2-3 oraciones",
+      "features": ["elemento clave 1","elemento clave 2","elemento clave 3","elemento clave 4"],
+      "references": ["referencia visual 1","referencia visual 2"],
+      "mood": "frase que capture el espíritu de la propuesta",
+      "image_prompts": [
+        "prompt detallado en inglés para vista frontal/exterior del stand, estilo arquitectónico, materialidades, iluminación, ambiente, render fotorrealista --ar 16:9",
+        "prompt detallado en inglés para vista interior/detalle del stand, perspectiva, materiales, --ar 4:3"
+      ]
+    },
+    { segunda propuesta con misma estructura }
+  ]
+}`});
+
+    const resp=await fetch('/api/estimate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:[{role:'user',content:userContent}],mode:'design'})});
+    if(!resp.ok)throw new Error('API '+resp.status+(resp.status===401?' — falta ANTHROPIC_API_KEY en Vercel':''));
     const data=await resp.json();
-    const clean=(data.text||'{}').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const clean=(data.text||'{}').replace(/```json[\s\S]*?```/g,s=>s.slice(7,-3).trim()).replace(/^```|```$/g,'').trim();
     const diseño=JSON.parse(clean);
-    const resultado={nombre,cliente,m2,tipo,pauta,brief,calc,params:parametros,moneda:monedaSnap,rubrosA:pipRubrosA.filter(r=>r.cant>0),rubrosB:pipRubrosB.filter(r=>r.cant*r.precio>0),propuestas:diseño.propuestas||[]};
-    try{await sb.from('proyectos').insert({nombre,cliente,brief_texto:brief,superficie_m2:m2||null,resultado,created_by:currentUser.id});}catch(e){console.warn('No se pudo guardar',e.message);}
+
+    const resultado={...res,propuestas:diseño.propuestas||[]};
+
+    // Guardar en Supabase
+    try{
+      await sb.from('proyectos').insert({
+        nombre:res.nombre,cliente:res.cliente,brief_texto:res.brief,
+        superficie_m2:res.m2||null,resultado,created_by:currentUser.id
+      });
+    }catch(e){console.warn('No se pudo guardar:',e.message);}
+
     clearInterval(si_int);
     renderPIPResult(resultado);
   }catch(e){
     clearInterval(si_int);
-    const errEl=document.getElementById('gen-error');errEl.textContent='⚠ '+e.message;errEl.style.display='';
+    const errEl=document.getElementById('gen-error');
+    errEl.textContent='⚠ '+e.message;errEl.style.display='';
     toast(e.message,'error');
   }
-  btn.disabled=false;btn.textContent='✦ Calcular precio de venta';
+  btn.disabled=false;
+  btn.innerHTML='✦ Generar propuesta estética con IA';
 }
+
+// Mantener referencia para compatibilidad con proyectos guardados anteriores
+async function generatePIP(){ calcularPrecio(); }
 
 // ── RENDER RESULTADO ──
 function renderPIPResult(res){
@@ -1412,6 +1536,16 @@ function renderProposal(p,i){
       ${p.features?.length?`<div class="mb-10"><div class="section-label">Elementos clave</div><div class="feature-grid">${p.features.map(f=>`<div class="feature-item">✦ ${f}</div>`).join('')}</div></div>`:''}
       ${p.references?.length?`<div class="mb-10"><div class="section-label">Referencias</div><div>${p.references.map(r=>`<span class="ref-tag">${r}</span>`).join('')}</div></div>`:''}
       ${p.mood?`<div class="mood-box">"${escHtml(p.mood)}"</div>`:''}
+      ${p.image_prompts&&p.image_prompts.length?`
+      <div style="margin-top:12px">
+        <div class="section-label">🎨 Prompts para generar imagen con IA</div>
+        ${p.image_prompts.map((pr,pi)=>`
+          <div style="background:#1B2A3B;border-radius:8px;padding:10px 12px;margin-bottom:6px;position:relative">
+            <div style="font-size:9px;font-weight:700;color:#A0B4C8;letter-spacing:.06em;margin-bottom:5px">PROMPT ${pi+1} — ${pi===0?'VISTA EXTERIOR':'VISTA DETALLE'}</div>
+            <div style="font-size:11px;color:#E8DDD4;line-height:1.5;font-family:monospace;word-break:break-word">${escHtml(pr)}</div>
+            <button onclick="copyPrompt(this)" data-prompt="${escHtml(pr)}" style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);border:none;border-radius:4px;color:#A0B4C8;font-size:10px;padding:3px 8px;cursor:pointer">Copiar</button>
+          </div>`).join('')}
+      </div>`:''}
     </div>
   </div>`;
 }
@@ -1425,6 +1559,10 @@ function resTab(id,btn){
 function resetPIP(){
   document.getElementById('pip-result').style.display='none';
   document.getElementById('pip-form').style.display='';
+  document.getElementById('step-calcular').style.display='';
+  document.getElementById('step-resultado').style.display='none';
+  if(document.getElementById('calc-preview'))document.getElementById('calc-preview').innerHTML='';
+  _calcSnapshot=null;
   uploadedFiles={brief:null,planta:null,render:null};
   ['brief','planta','render'].forEach(t=>{
     const dz=document.getElementById('dz-'+t);
@@ -1682,6 +1820,14 @@ function renderMonedaBox(mon,c,monSym){
 }
 
 // ── UTILS ──
+function copyPrompt(btn){
+  const text=btn.dataset.prompt;
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.textContent;btn.textContent='✓ Copiado';btn.style.background='rgba(46,125,82,.4)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background='rgba(255,255,255,.1)';},2000);
+  }).catch(()=>toast('No se pudo copiar','error'));
+}
+
 function fmt(n){return Math.round(n||0).toLocaleString('es-AR');}
 function escHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg,type=''){
