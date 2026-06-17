@@ -286,6 +286,56 @@ small{font-size:10px;color:#999}
           </div>
         </div>
 
+        <!-- MÓDULO MONEDA -->
+        <div class="card">
+          <div class="card-header">
+            <h3>💱 Moneda de cotización</h3>
+            <span id="tc-final-badge" style="font-weight:700;color:var(--gold);font-size:13px">ARS — Pesos</span>
+          </div>
+          <div class="card-body">
+            <div class="grid-2 mb-10" style="gap:14px">
+              <div>
+                <label class="field-label">Moneda de venta</label>
+                <select id="pip-moneda" onchange="onMonedaChange()">
+                  <option value="ARS">🇦🇷 Pesos (ARS)</option>
+                  <option value="USD">🇺🇸 Dólares (USD)</option>
+                  <option value="EUR">🇪🇺 Euros (EUR)</option>
+                  <option value="BRL">🇧🇷 Reales (BRL)</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Modalidad de oferta</label>
+                <select id="pip-oferta">
+                  <option value="singular">Singular</option>
+                  <option value="plural">Plural (múltiples stands)</option>
+                </select>
+              </div>
+            </div>
+            <div id="tc-panel" style="display:none">
+              <div class="grid-2 mb-10" style="gap:14px">
+                <div>
+                  <label class="field-label">Cotización <span id="tc-moneda-label">USD</span> (en $)</label>
+                  <input type="number" id="pip-cotizacion" placeholder="Ej: 1200" oninput="calcTC()" inputmode="numeric" />
+                </div>
+                <div>
+                  <label class="field-label">Margen seguridad cambiario (%)</label>
+                  <input type="number" id="pip-mg-cambio" value="2" oninput="calcTC()" inputmode="numeric" />
+                </div>
+              </div>
+              <div style="background:#F7F3EE;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--navy)">Tipo de cambio final</div>
+                  <div style="font-size:10px;color:#888;margin-top:2px">Cotización × (1 − mg. seguridad)</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:11px;color:#888">1 <span id="tc-sym">USD</span> =</div>
+                  <div id="tc-final-display" style="font-size:18px;font-weight:700;color:var(--navy)">$ —</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Archivos -->
         <div class="card">
           <div class="card-header"><h3>Documentación</h3></div>
@@ -434,6 +484,7 @@ let currentPreciosTab='pisos';
 let uploadedFiles={brief:null,planta:null,render:null};
 let pipRubrosA=[];
 let pipRubrosB=[];
+let monedaConfig={moneda:'ARS',simbolo:'$',cotizacion:1,mgCambio:0.02,tcFinal:1,oferta:'singular'};
 
 const DEFAULT_PARAMS={margen_seguridad:0.02,costo_admin:0.05,margen:0.10,iibb:0.035,ganancias:0.037,sello:0.008,debcred:0.0098,costo_financiero:0.02,comision_agencia:0.00,iva:0.21};
 const PARAM_LABELS={margen_seguridad:'Margen seguridad',costo_admin:'Gastos Admin.',margen:'Margen ganancia',iibb:'Ingresos Brutos',ganancias:'Ganancias',sello:'Imp. Sello',debcred:'Déb/Créd Bancario',costo_financiero:'Costo Financiero',comision_agencia:'Comisión Agencia',iva:'IVA'};
@@ -533,6 +584,52 @@ const RUBRO_SECTIONS=[
   {key:'audiovisual',label:'📺 Audio y video'},
   {key:'otros',label:'📦 Otros / Servicios'},
 ];
+
+
+// ── MONEDA ──
+const MONEDAS={
+  ARS:{simbolo:'$',label:'Pesos (ARS)',flag:'🇦🇷'},
+  USD:{simbolo:'USD',label:'Dólares (USD)',flag:'🇺🇸'},
+  EUR:{simbolo:'EUR',label:'Euros (EUR)',flag:'🇪🇺'},
+  BRL:{simbolo:'R$',label:'Reales (BRL)',flag:'🇧🇷'},
+};
+
+function onMonedaChange(){
+  const mon=document.getElementById('pip-moneda').value;
+  const isARS=mon==='ARS';
+  document.getElementById('tc-panel').style.display=isARS?'none':'';
+  document.getElementById('tc-moneda-label').textContent=mon;
+  document.getElementById('tc-sym').textContent=mon;
+  document.getElementById('tc-final-badge').textContent=isARS?'ARS — Pesos':MONEDAS[mon]?.label||mon;
+  monedaConfig.moneda=mon;
+  calcTC();
+}
+
+function calcTC(){
+  const mon=monedaConfig.moneda;
+  if(mon==='ARS'){monedaConfig.tcFinal=1;monedaConfig.cotizacion=1;return;}
+  const cot=parseFloat(document.getElementById('pip-cotizacion').value)||0;
+  const mg=parseFloat(document.getElementById('pip-mg-cambio').value)||2;
+  monedaConfig.cotizacion=cot;
+  monedaConfig.mgCambio=mg/100;
+  monedaConfig.tcFinal=cot*(1-mg/100);
+  const tcEl=document.getElementById('tc-final-display');
+  if(tcEl) tcEl.textContent=cot>0?'$ '+fmt(monedaConfig.tcFinal):'$ —';
+  const badge=document.getElementById('tc-final-badge');
+  if(badge) badge.textContent=cot>0?`TC: $ ${fmt(monedaConfig.tcFinal)}`:(MONEDAS[mon]?.label||mon);
+}
+
+// Convierte monto en ARS → moneda de venta
+function toSalida(ars){
+  if(monedaConfig.moneda==='ARS') return ars;
+  return monedaConfig.tcFinal>0?ars/monedaConfig.tcFinal:0;
+}
+
+function fmtSalida(ars){
+  const val=toSalida(ars);
+  const sym=monedaConfig.moneda==='ARS'?'$':(MONEDAS[monedaConfig.moneda]?.simbolo||monedaConfig.moneda);
+  return sym+' '+fmt(val);
+}
 
 // ── INIT ──
 window.addEventListener('DOMContentLoaded',async()=>{
@@ -853,6 +950,10 @@ async function generatePIP(){
     const cliente=document.getElementById('pip-cliente').value.trim();
     const pauta=document.getElementById('pip-pauta').value;
     const tipo=document.getElementById('pip-tipo').options[document.getElementById('pip-tipo').selectedIndex].text;
+    // Capturar config moneda
+    const oferta=document.getElementById('pip-oferta').value;
+    monedaConfig.oferta=oferta;
+    const monedaSnap={...monedaConfig};
     const userContent=[];
     if(brief)userContent.push({type:'text',text:'BRIEF:\n'+brief});
     for(const type of ['brief','planta','render']){
@@ -869,7 +970,7 @@ async function generatePIP(){
     const data=await resp.json();
     const clean=(data.text||'{}').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     const diseño=JSON.parse(clean);
-    const resultado={nombre,cliente,m2,tipo,pauta,brief,calc,params:parametros,rubrosA:pipRubrosA.filter(r=>r.cant>0),rubrosB:pipRubrosB.filter(r=>r.cant*r.precio>0),propuestas:diseño.propuestas||[]};
+    const resultado={nombre,cliente,m2,tipo,pauta,brief,calc,params:parametros,moneda:monedaSnap,rubrosA:pipRubrosA.filter(r=>r.cant>0),rubrosB:pipRubrosB.filter(r=>r.cant*r.precio>0),propuestas:diseño.propuestas||[]};
     try{await sb.from('proyectos').insert({nombre,cliente,brief_texto:brief,superficie_m2:m2||null,resultado,created_by:currentUser.id});}catch(e){console.warn('No se pudo guardar',e.message);}
     clearInterval(si_int);
     renderPIPResult(resultado);
@@ -889,6 +990,12 @@ function renderPIPResult(res){
   const m2=parseFloat(res.m2)||1;
   const pautaOk=res.pauta&&parseFloat(res.pauta)>0;
   const enPauta=pautaOk&&c.precioNeto<=parseFloat(res.pauta);
+  // Restaurar config de moneda del resultado guardado
+  const mon=res.moneda||{moneda:'ARS',simbolo:'$',tcFinal:1,oferta:'singular'};
+  const isARS=mon.moneda==='ARS';
+  const monSym=isARS?'$':(MONEDAS[mon.moneda]?.simbolo||mon.moneda);
+  const fmtM=v=>monSym+' '+fmt(isARS?v:(mon.tcFinal>0?v/mon.tcFinal:0));
+  const fmtM_m2=v=>monSym+' '+fmt(isARS?v/m2:(mon.tcFinal>0?(v/mon.tcFinal)/m2:0));
 
   rv.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -908,11 +1015,11 @@ function renderPIPResult(res){
         ${pautaOk?`<div style="background:${enPauta?'var(--green)':'var(--red)'};border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:#fff">${enPauta?'✓ En pauta':'⚠ Sobre pauta'}</div>`:''}
       </div>
       <div class="summary-stats">
-        <div><div class="stat-label">Costo A+B</div><div class="stat-value" style="font-size:14px">$ ${fmt(c.costoTotal)}</div></div>
-        <div><div class="stat-label">Precio neto</div><div class="stat-value gold">$ ${fmt(c.precioNeto)}</div></div>
-        <div><div class="stat-label">Total c/IVA</div><div class="stat-value">$ ${fmt(c.precioTotal)}</div></div>
-        <div><div class="stat-label">$/m²</div><div class="stat-value" style="font-size:14px">$ ${fmt(c.precioNeto/m2)}</div></div>
-      </div>
+        <div><div class="stat-label">Costo A+B (ARS)</div><div class="stat-value" style="font-size:13px">$ ${fmt(c.costoTotal)}</div></div>
+        <div><div class="stat-label">Precio neto</div><div class="stat-value gold">${fmtM(c.precioNeto)}</div></div>
+        <div><div class="stat-label">Total c/IVA</div><div class="stat-value">${fmtM(c.precioTotal)}</div></div>
+        <div><div class="stat-label">${monSym}/m²</div><div class="stat-value" style="font-size:13px">${fmtM_m2(c.precioNeto)}</div></div>
+        ${!isARS?`<div><div class="stat-label">TC Final</div><div class="stat-value" style="font-size:13px">$ ${fmt(mon.tcFinal)}</div></div>`:""}
     </div>
 
     <div class="tabs" id="res-tabs">
@@ -924,11 +1031,11 @@ function renderPIPResult(res){
     <!-- PRECIO -->
     <div id="res-precio">
       <div class="metric-grid">
-        ${mbox('Contrib. Marginal','$ '+fmt(c.contribucionMarginal),'var(--blue)')}
+        ${mbox("Contrib. Marginal","$ "+fmt(c.contribucionMarginal),"var(--blue)")}
         ${mbox('% Contrib.',pct(c.pctContribMarginal),c.pctContribMarginal>=0.25?'var(--green)':'var(--red)')}
         ${mbox('Utilidad Neta','$ '+fmt(c.utilidadNeta),'var(--green)')}
         ${mbox('% Utilidad',pct(c.pctUtilidadNeta),c.pctUtilidadNeta>=0.08?'var(--green)':'var(--red)')}
-        ${mbox('Precio/m²','$ '+fmt(c.precioNeto/m2),'var(--navy)')}
+        ${mbox(monSym+"/m²",fmtM_m2(c.precioNeto),"var(--navy)")}
         ${mbox('Markup',c.markup.toFixed(2)+'x',c.markup>=1.3?'var(--green)':'var(--red)')}
       </div>
       <div class="res-waterfall">
@@ -944,14 +1051,27 @@ function renderPIPResult(res){
         <div class="res-row"><span>IIBB+Gcias+Sello+Déb/Créd</span><span class="res-val">$ ${fmt(c.impuestos)}</span></div>
         <div class="res-row"><span>Costo Financiero (${pct(p.costo_financiero)})</span><span class="res-val">$ ${fmt(c.costoFin)}</span></div>
         ${c.comisionAgencia>0?`<div class="res-row"><span>Comisión Agencia (${pct(p.comision_agencia)})</span><span class="res-val">$ ${fmt(c.comisionAgencia)}</span></div>`:''}
-        <div class="res-row subtotal"><span>PRECIO NETO (sin IVA)</span><span class="res-val">$ ${fmt(c.precioNeto)}</span></div>
+        <div class="res-row subtotal"><span>PRECIO NETO en ARS (sin IVA)</span><span class="res-val">$ ${fmt(c.precioNeto)}</span></div>
         <div class="res-row"><span>IVA 21%</span><span class="res-val">$ ${fmt(c.iva)}</span></div>
-        <div class="res-row total"><span>PRECIO TOTAL + IVA</span><span class="res-val">$ ${fmt(c.precioTotal)}</span></div>
+        <div class="res-row total"><span>PRECIO TOTAL + IVA (ARS)</span><span class="res-val">$ ${fmt(c.precioTotal)}</span></div>
       </div>
       ${pautaOk?`<div class="warn-box mt-10" style="border-color:${enPauta?'#A8D5B8':'#F8C5BC'};background:${enPauta?'#E8F5EE':'#FFF0EE'}">
         <div style="font-size:12px;font-weight:700;color:${enPauta?'var(--green)':'var(--red)'};margin-bottom:3px">Pauta del cliente: $ ${fmt(parseFloat(res.pauta))}</div>
         <div style="font-size:11px;color:#555">${enPauta?'✓ El precio está dentro de la pauta.':'⚠ Supera la pauta en $ '+fmt(c.precioNeto-parseFloat(res.pauta))+'. Revisá rubros o margen.'}</div>
       </div>`:''}
+      </div>`:""}
+      ${!isARS?`<div class="info-box mt-10">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:7px">💱 Conversión a ${MONEDAS[mon.moneda]?.label||mon.moneda}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;margin-bottom:8px">
+          <div><div style="color:#888;font-size:10px;margin-bottom:2px">Cotización</div><div style="font-weight:700">$ ${fmt(mon.cotizacion)}</div></div>
+          <div><div style="color:#888;font-size:10px;margin-bottom:2px">Mg. seguridad</div><div style="font-weight:700">${((mon.mgCambio||0)*100).toFixed(1)}%</div></div>
+          <div><div style="color:#888;font-size:10px;margin-bottom:2px">TC final</div><div style="font-weight:700;color:var(--gold)">$ ${fmt(mon.tcFinal)}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--border);padding-top:8px">
+          <div><div style="color:#888;font-size:10px;margin-bottom:2px">Precio neto en ${mon.moneda}</div><div style="font-weight:700;font-size:17px;color:var(--gold)">${monSym} ${fmt(c.precioNeto/mon.tcFinal)}</div></div>
+          <div><div style="color:#888;font-size:10px;margin-bottom:2px">Total + IVA en ${mon.moneda}</div><div style="font-weight:700;font-size:17px">${monSym} ${fmt(c.precioTotal/mon.tcFinal)}</div></div>
+        </div>
+      </div>`:""}
     </div>
 
     <!-- RUBROS -->
