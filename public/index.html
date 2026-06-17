@@ -745,10 +745,29 @@ async function loadCatalog(){
   Object.keys(DEFAULT_CATALOG).forEach(k=>{if(!preciosCatalog[k])preciosCatalog[k]=[];});
 }
 async function savePrecios(){
+  const btn=document.getElementById('btn-save-precios');
+  if(btn){btn.disabled=true;btn.textContent='Guardando...';}
   try{
-    await sb.from('config').upsert({key:'catalogo',value:JSON.stringify(preciosCatalog),updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'key'});
+    await sb.from('config').upsert(
+      {key:'catalogo',value:JSON.stringify(preciosCatalog),updated_by:currentUser.id,updated_at:new Date().toISOString()},
+      {onConflict:'key'}
+    );
     toast('✓ Precios guardados','success');
-  }catch(e){toast('Error al guardar: '+e.message,'error');}
+    if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
+    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar';btn.disabled=false;}},2000);
+  }catch(e){
+    toast('Error: '+e.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='Guardar';}
+  }
+}
+
+// Marcar cambios pendientes en precios
+function markPreciosDirty(){
+  const btn=document.getElementById('btn-save-precios');
+  if(btn&&btn.textContent!=='Guardando...'&&btn.textContent!=='✓ Guardado'){
+    btn.style.background='var(--accent)';
+    btn.textContent='Guardar cambios ●';
+  }
 }
 function preciosTab(tab,btn){
   currentPreciosTab=tab;
@@ -756,33 +775,92 @@ function preciosTab(tab,btn){
   btn.classList.add('active');
   renderPreciosTab(tab);
 }
+// ── CATÁLOGO: funciones de edición directa sin rerenderizar ──
+const PRECIO_UNITS=['u','m²','m lineal','global','kg','lt','día','mes'];
+
 function renderPreciosTab(tab){
   const items=preciosCatalog[tab]||[];
   const cont=document.getElementById('precios-content');
   if(!cont)return;
-  const UNITS=['u','m²','m lineal','global','kg','lt','día','mes'];
-  if(!items.length){cont.innerHTML='<div class="empty-state" style="padding:20px">Sin ítems — usá + ítem para agregar</div>';return;}
-  cont.innerHTML=items.map((it,i)=>{
-    const unitOpts=UNITS.map(u=>'<option value="'+u+'"'+(it.unit===u?' selected':'')+'>'+u+'</option>').join('');
-    return '<div class="precio-item">'
-      +'<div style="flex:1">'
-      +'<input style="border:none;background:transparent;font-size:12px;font-weight:600;padding:0;width:100%;outline:none;color:var(--navy)" value="'+escHtml(it.label)+'" onchange="preciosCatalog['+JSON.stringify(tab)+']['+i+'].label=this.value" />'
-      +'<select onchange="preciosCatalog['+JSON.stringify(tab)+']['+i+'].unit=this.value" style="font-size:10px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:#FDFAF7;color:#666;outline:none;margin-top:2px">'+unitOpts+'</select>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">'
-      +'<span style="font-size:11px;color:#888">$</span>'
-      +'<input type="number" style="width:90px;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-weight:700;color:var(--navy);background:#FDFAF7;outline:none;text-align:right" value="'+it.precio+'" onchange="preciosCatalog['+JSON.stringify(tab)+']['+i+'].precio=parseFloat(this.value)||0" inputmode="decimal" />'
-      +'</div>'
-      +'<button style="background:none;border:none;cursor:pointer;color:#ddd;font-size:16px;padding:0 4px;flex-shrink:0" onclick="deleteCatalogItem(currentPreciosTab,'+i+')">×</button>'
-      +'</div>';
-  }).join('');
+  // Construir DOM directamente para evitar problemas de escaping en onchange
+  cont.innerHTML='';
+  if(!items.length){
+    cont.innerHTML='<div class="empty-state" style="padding:20px">Sin ítems — agregá con el botón +</div>';
+    return;
+  }
+  items.forEach((it,i)=>{
+    const row=document.createElement('div');
+    row.className='precio-item';
+    row.dataset.idx=i;
+
+    // Label
+    const labelWrap=document.createElement('div');
+    labelWrap.style.cssText='flex:1;min-width:0';
+    const labelInput=document.createElement('input');
+    labelInput.value=it.label||'';
+    labelInput.placeholder='Descripción del ítem';
+    labelInput.style.cssText='border:none;background:transparent;font-size:12px;font-weight:600;padding:2px 0;width:100%;outline:none;color:var(--navy)';
+    labelInput.addEventListener('input',()=>{preciosCatalog[tab][i].label=labelInput.value;markPreciosDirty();});
+    labelInput.addEventListener('focus',()=>{labelInput.style.borderBottom='1.5px solid var(--accent)';});
+    labelInput.addEventListener('blur',()=>{labelInput.style.borderBottom='none';});
+
+    // Unidad
+    const unitSel=document.createElement('select');
+    unitSel.style.cssText='font-size:10px;border:1px solid var(--border);border-radius:4px;padding:2px 5px;background:#FDFAF7;color:#666;outline:none;margin-top:3px;display:block';
+    PRECIO_UNITS.forEach(u=>{
+      const opt=document.createElement('option');
+      opt.value=u; opt.textContent=u;
+      if(it.unit===u) opt.selected=true;
+      unitSel.appendChild(opt);
+    });
+    unitSel.addEventListener('change',()=>{preciosCatalog[tab][i].unit=unitSel.value;markPreciosDirty();});
+    labelWrap.appendChild(labelInput);
+    labelWrap.appendChild(unitSel);
+
+    // Precio
+    const priceWrap=document.createElement('div');
+    priceWrap.style.cssText='display:flex;align-items:center;gap:4px;flex-shrink:0';
+    const sym=document.createElement('span');
+    sym.textContent='$'; sym.style.cssText='font-size:11px;color:#888';
+    const priceInput=document.createElement('input');
+    priceInput.type='number';
+    priceInput.value=it.precio||0;
+    priceInput.inputMode='decimal';
+    priceInput.style.cssText='width:90px;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:13px;font-weight:700;color:var(--navy);background:#FDFAF7;outline:none;text-align:right';
+    priceInput.addEventListener('focus',()=>{priceInput.style.borderColor='var(--accent)';});
+    priceInput.addEventListener('blur',()=>{priceInput.style.borderColor='var(--border)';});
+    priceInput.addEventListener('input',()=>{preciosCatalog[tab][i].precio=parseFloat(priceInput.value)||0;markPreciosDirty();});
+    priceWrap.appendChild(sym);
+    priceWrap.appendChild(priceInput);
+
+    // Botón eliminar
+    const delBtn=document.createElement('button');
+    delBtn.textContent='×';
+    delBtn.style.cssText='background:none;border:none;cursor:pointer;color:#ddd;font-size:18px;padding:0 4px;flex-shrink:0;line-height:1';
+    delBtn.addEventListener('mouseenter',()=>{delBtn.style.color='#C0392B';});
+    delBtn.addEventListener('mouseleave',()=>{delBtn.style.color='#ddd';});
+    delBtn.addEventListener('click',()=>{preciosCatalog[tab].splice(i,1);renderPreciosTab(tab);});
+
+    row.appendChild(labelWrap);
+    row.appendChild(priceWrap);
+    row.appendChild(delBtn);
+    cont.appendChild(row);
+  });
 }
-function updateCatalogItem(tab,i,field,val){if(preciosCatalog[tab]&&preciosCatalog[tab][i])preciosCatalog[tab][i][field]=val;}
+
+function updateCatalogItem(tab,i,field,val){
+  if(preciosCatalog[tab]&&preciosCatalog[tab][i]) preciosCatalog[tab][i][field]=val;
+}
 function deleteCatalogItem(tab,i){preciosCatalog[tab].splice(i,1);renderPreciosTab(tab);}
 function addCatalogItem(tab){
   if(!preciosCatalog[tab])preciosCatalog[tab]=[];
   preciosCatalog[tab].push({id:'new_'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0});
   renderPreciosTab(tab);
+  // Foco en el último label agregado
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('#precios-content .precio-item');
+    if(rows.length){const inp=rows[rows.length-1].querySelector('input');if(inp)inp.focus();}
+  },50);
 }
 async function applyInflacion(){
   const pct=parseFloat(document.getElementById('inflacion-pct').value);
