@@ -1436,32 +1436,209 @@ function resetPIP(){
 }
 
 // ── PROYECTOS ──
+// ── PROYECTOS ──
+let _proyectosData=[];
+
 async function loadProyectos(){
-  const{data}=await sb.from('proyectos').select('*,p:profiles(full_name)').order('created_at',{ascending:false});
   const el=document.getElementById('proyectos-list');
-  if(!data||!data.length){el.innerHTML='<div class="empty-state">Sin proyectos todavía</div>';return;}
-  const estados={borrador:'badge-muted',enviado:'badge-gold',aprobado:'badge-green',rechazado:'badge-red'};
-  el.innerHTML=data.map(p=>{
+  el.innerHTML='<div class="empty-state"><span class="spinner">⟳</span></div>';
+  const{data}=await sb.from('proyectos').select('*,p:profiles(full_name)').order('created_at',{ascending:false});
+  _proyectosData=data||[];
+  renderProyectosList();
+}
+
+function renderProyectosList(){
+  const el=document.getElementById('proyectos-list');
+  if(!_proyectosData.length){el.innerHTML='<div class="empty-state">Sin proyectos todavía.<br><small>Creá el primero con "Nuevo PIP".</small></div>';return;}
+
+  const estadoStyles={
+    borrador:{badge:'badge-muted',label:'Borrador'},
+    enviado:{badge:'badge-gold',label:'Enviado'},
+    aprobado:{badge:'badge-green',label:'Aprobado'},
+    rechazado:{badge:'badge-red',label:'Rechazado'},
+  };
+
+  el.innerHTML='';
+  _proyectosData.forEach(p=>{
     const c=p.resultado?.calc;
     const fecha=new Date(p.created_at).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'2-digit'});
-    return `<div class="proj-card" onclick="openProyecto('${p.id}')">
-      <div style="flex:1">
-        <div style="font-weight:700;color:var(--navy);font-size:13px">${escHtml(p.nombre)}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px">${p.cliente?escHtml(p.cliente)+' · ':''}${p.superficie_m2?p.superficie_m2+' m² · ':''}${fecha}</div>
-        <div style="font-size:10px;color:#aaa;margin-top:1px">${p.p?.full_name||''}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        ${c?`<div style="font-weight:700;color:var(--navy);font-size:13px">$ ${fmt(c.precioNeto)}</div><div style="font-size:10px;color:#888">$ ${fmt(c.precioNeto/(parseFloat(p.superficie_m2)||1))}/m²</div>`:''}
-        <div style="margin-top:4px"><span class="badge ${estados[p.estado]||'badge-muted'}">${p.estado||'borrador'}</span></div>
-      </div>
-    </div>`;
-  }).join('');
+    const es=estadoStyles[p.estado]||estadoStyles.borrador;
+    const isOwner=p.created_by===currentUser?.id;
+
+    const card=document.createElement('div');
+    card.style.cssText='background:#fff;border:1px solid var(--border);border-radius:11px;margin-bottom:10px;overflow:hidden;box-shadow:0 2px 8px rgba(27,42,59,.05)';
+
+    // Main row — clickable to view
+    const main=document.createElement('div');
+    main.style.cssText='display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:13px 14px;cursor:pointer';
+    main.addEventListener('click',()=>openProyecto(p.id));
+    main.addEventListener('mouseenter',()=>{main.style.background='#FFFBF8';});
+    main.addEventListener('mouseleave',()=>{main.style.background='';});
+
+    main.innerHTML=
+      '<div style="flex:1;min-width:0">'
+      +'<div style="font-weight:700;color:var(--navy);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(p.nombre)+'</div>'
+      +'<div style="font-size:11px;color:#888;margin-top:2px">'+(p.cliente?escHtml(p.cliente)+' · ':'')+(p.superficie_m2?p.superficie_m2+' m² · ':'')+fecha+'</div>'
+      +'<div style="font-size:10px;color:#aaa;margin-top:1px">'+escHtml(p.p?.full_name||'')+'</div>'
+      +'</div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +(c?'<div style="font-weight:700;color:var(--navy);font-size:14px">$ '+fmt(c.precioNeto)+'</div>'
+          +'<div style="font-size:10px;color:#888">$ '+fmt(c.precioNeto/(parseFloat(p.superficie_m2)||1))+'/m²</div>':'')
+      +'<div style="margin-top:5px"><span class="badge '+es.badge+'">'+es.label+'</span></div>'
+      +'</div>';
+
+    // Action bar
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;gap:0;border-top:1px solid #F5F0EA';
+
+    // Estado selector
+    const estadoSel=document.createElement('select');
+    estadoSel.style.cssText='flex:1;border:none;background:transparent;font-size:11px;color:#666;padding:7px 10px;outline:none;cursor:pointer;font-family:inherit';
+    ['borrador','enviado','aprobado','rechazado'].forEach(st=>{
+      const o=document.createElement('option');
+      o.value=st;o.textContent={borrador:'Borrador',enviado:'Enviado',aprobado:'Aprobado',rechazado:'Rechazado'}[st];
+      if(p.estado===st)o.selected=true;
+      estadoSel.appendChild(o);
+    });
+    estadoSel.addEventListener('change',async(e)=>{
+      e.stopPropagation();
+      await cambiarEstado(p.id,estadoSel.value);
+    });
+
+    // Botón editar datos básicos
+    const editBtn=document.createElement('button');
+    editBtn.textContent='✏ Editar';
+    editBtn.style.cssText='border:none;border-left:1px solid #F5F0EA;background:transparent;font-size:11px;color:#666;padding:7px 12px;cursor:pointer;font-family:inherit;white-space:nowrap';
+    editBtn.addEventListener('mouseenter',()=>{editBtn.style.color='var(--navy)';editBtn.style.background='#F7F3EE';});
+    editBtn.addEventListener('mouseleave',()=>{editBtn.style.color='#666';editBtn.style.background='transparent';});
+    editBtn.addEventListener('click',(e)=>{e.stopPropagation();editProyecto(p.id);});
+
+    // Botón duplicar
+    const dupBtn=document.createElement('button');
+    dupBtn.textContent='⧉ Duplicar';
+    dupBtn.style.cssText='border:none;border-left:1px solid #F5F0EA;background:transparent;font-size:11px;color:#666;padding:7px 12px;cursor:pointer;font-family:inherit;white-space:nowrap';
+    dupBtn.addEventListener('mouseenter',()=>{dupBtn.style.color='var(--navy)';dupBtn.style.background='#F7F3EE';});
+    dupBtn.addEventListener('mouseleave',()=>{dupBtn.style.color='#666';dupBtn.style.background='transparent';});
+    dupBtn.addEventListener('click',(e)=>{e.stopPropagation();duplicarProyecto(p.id);});
+
+    // Botón eliminar (solo dueño)
+    if(isOwner){
+      const delBtn=document.createElement('button');
+      delBtn.textContent='🗑';
+      delBtn.title='Eliminar proyecto';
+      delBtn.style.cssText='border:none;border-left:1px solid #F5F0EA;background:transparent;font-size:13px;color:#ccc;padding:7px 12px;cursor:pointer;font-family:inherit';
+      delBtn.addEventListener('mouseenter',()=>{delBtn.style.color='#C0392B';delBtn.style.background='#FFF0EE';});
+      delBtn.addEventListener('mouseleave',()=>{delBtn.style.color='#ccc';delBtn.style.background='transparent';});
+      delBtn.addEventListener('click',(e)=>{e.stopPropagation();confirmarEliminar(p.id,p.nombre);});
+      actions.appendChild(delBtn);
+    }
+
+    actions.insertBefore(estadoSel,actions.firstChild);
+    actions.insertBefore(editBtn,actions.firstChild.nextSibling);
+    actions.insertBefore(dupBtn,actions.children[2]||null);
+
+    card.appendChild(main);
+    card.appendChild(actions);
+    el.appendChild(card);
+  });
 }
-const _pc={};
+
+async function cambiarEstado(id,estado){
+  await sb.from('proyectos').update({estado,updated_at:new Date().toISOString()}).eq('id',id);
+  const p=_proyectosData.find(x=>x.id===id);
+  if(p) p.estado=estado;
+  toast('Estado actualizado: '+estado,'success');
+}
+
 async function openProyecto(id){
-  if(!_pc[id]){const{data}=await sb.from('proyectos').select('*').eq('id',id).single();_pc[id]=data;}
-  if(!_pc[id]?.resultado)return toast('Sin resultado','error');
-  showView('pip');renderPIPResult(_pc[id].resultado);
+  const p=_proyectosData.find(x=>x.id===id)||await sb.from('proyectos').select('*').eq('id',id).single().then(r=>r.data);
+  if(!p?.resultado)return toast('Sin resultado guardado','error');
+  showView('pip');
+  renderPIPResult(p.resultado);
+}
+
+function editProyecto(id){
+  const p=_proyectosData.find(x=>x.id===id);
+  if(!p)return;
+  showModal(`
+    <h3 style="font-family:'Georgia',serif;color:var(--navy);margin-bottom:14px">Editar proyecto</h3>
+    <div class="mb-10"><label class="field-label">Nombre</label><input id="edit-nombre" value="${escHtml(p.nombre)}" style="width:100%" /></div>
+    <div class="mb-10"><label class="field-label">Cliente</label><input id="edit-cliente" value="${escHtml(p.cliente||'')}" style="width:100%" /></div>
+    <div class="mb-10"><label class="field-label">M²</label><input type="number" id="edit-m2" value="${p.superficie_m2||''}" style="width:100%" /></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" style="flex:1" onclick="guardarEditProyecto('${id}')">Guardar</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+    </div>
+  `);
+}
+
+async function guardarEditProyecto(id){
+  const nombre=document.getElementById('edit-nombre').value.trim();
+  const cliente=document.getElementById('edit-cliente').value.trim();
+  const m2=document.getElementById('edit-m2').value;
+  if(!nombre)return toast('El nombre es obligatorio','error');
+  await sb.from('proyectos').update({nombre,cliente,superficie_m2:m2||null,updated_at:new Date().toISOString()}).eq('id',id);
+  const p=_proyectosData.find(x=>x.id===id);
+  if(p){p.nombre=nombre;p.cliente=cliente;p.superficie_m2=m2||null;}
+  closeModal();
+  renderProyectosList();
+  toast('✓ Proyecto actualizado','success');
+}
+
+async function duplicarProyecto(id){
+  const p=_proyectosData.find(x=>x.id===id);
+  if(!p)return;
+  const{data}=await sb.from('proyectos').insert({
+    nombre:'Copia — '+p.nombre,
+    cliente:p.cliente,
+    brief_texto:p.brief_texto,
+    superficie_m2:p.superficie_m2,
+    resultado:p.resultado,
+    estado:'borrador',
+    created_by:currentUser.id
+  }).select().single();
+  if(data){_proyectosData.unshift(data);renderProyectosList();}
+  toast('✓ Proyecto duplicado','success');
+}
+
+function confirmarEliminar(id,nombre){
+  showModal(`
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:32px;margin-bottom:12px">🗑</div>
+      <h3 style="font-family:'Georgia',serif;color:var(--navy);margin-bottom:8px">Eliminar proyecto</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:20px">¿Eliminás "<strong>${escHtml(nombre)}</strong>"?<br>Esta acción no se puede deshacer.</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+        <button class="btn" style="flex:1;background:var(--red);color:#fff" onclick="eliminarProyecto('${id}')">Eliminar</button>
+      </div>
+    </div>
+  `);
+}
+
+async function eliminarProyecto(id){
+  await sb.from('proyectos').delete().eq('id',id);
+  _proyectosData=_proyectosData.filter(x=>x.id!==id);
+  closeModal();
+  renderProyectosList();
+  toast('Proyecto eliminado');
+}
+
+// ── MODAL LIVIANO ──
+function showModal(html){
+  let overlay=document.getElementById('modal-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='modal-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.addEventListener('click',(e)=>{if(e.target===overlay)closeModal();});
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25)">'+html+'</div>';
+  overlay.style.display='flex';
+}
+function closeModal(){
+  const o=document.getElementById('modal-overlay');
+  if(o)o.style.display='none';
 }
 
 // ── EQUIPO ──
