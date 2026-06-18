@@ -2617,29 +2617,38 @@ function printOferta(){
 }
 
 function printContent(el){
-  if(!el){console.warn('printContent: el is null');return;}
-  // Capturar HTML ANTES de tocar el DOM
+  if(!el){toast('Error: elemento no encontrado','error');return;}
+  // Mostrar temporalmente si está oculto
+  const wasHidden=el.style.display==='none';
+  if(wasHidden)el.style.display='block';
+  // Capturar HTML
   const html=el.innerHTML;
-  if(!html||html.trim()===''){console.warn('printContent: empty html');return;}
-  // Obtener estilos del <style> tag del head
-  const styleEl=document.querySelector('style');
-  const css=styleEl?styleEl.innerHTML:'';
-  // Abrir ventana nueva
-  const win=window.open('','','width=1000,height=800,scrollbars=yes');
-  if(!win){alert('Bloqueador de popups activo. Permitir popups para este sitio.');return;}
-  win.document.open();
-  win.document.write('<!DOCTYPE html><html><head>'
+  if(wasHidden)el.style.display='none';
+  if(!html||!html.trim()){toast('Sin contenido para imprimir','error');return;}
+  // Obtener CSS del <style> del head
+  const css=Array.from(document.querySelectorAll('style')).map(s=>s.innerHTML).join('\n');
+  // Crear iframe invisible
+  const iframe=document.createElement('iframe');
+  iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:none';
+  document.body.appendChild(iframe);
+  const doc=iframe.contentDocument||iframe.contentWindow.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head>'
     +'<meta charset="UTF-8">'
-    +'<meta name="viewport" content="width=device-width">'
-    +'<title>DALI — Cotizacion</title>'
+    +'<title>DALI</title>'
     +'<style>'+css+'</style>'
-    +'<style>body{background:#fff!important;padding:16px;margin:0}.no-print{display:none!important}</style>'
-    +'</head><body>'
-    +html
-    +'</body></html>');
-  win.document.close();
-  win.onload=function(){
-    setTimeout(function(){win.focus();win.print();},300);
+    +'<style>body{background:#fff!important;padding:20px;margin:0;font-family:Arial,sans-serif}'
+    +'.no-print{display:none!important}'
+    +'button{display:none!important}'
+    +'</style>'
+    +'</head><body>'+html+'</body></html>');
+  doc.close();
+  iframe.onload=function(){
+    setTimeout(function(){
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(function(){document.body.removeChild(iframe);},1000);
+    },400);
   };
 }
 
