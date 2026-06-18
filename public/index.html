@@ -1929,173 +1929,187 @@ function pct(n){return((n||0)*100).toFixed(1)+'%';}
 
 function renderOferta(res,c,m2,monSym,fmtM){
   const r=res;
-  const moneda=r.moneda||{moneda:'ARS',tcFinal:1};
+  const moneda=r.moneda||{moneda:'ARS',tcFinal:1,mgCambio:0.02};
   const isARS=moneda.moneda==='ARS';
-  const precioVenta=isARS?c.precioNeto:(c.precioNeto/moneda.tcFinal);
-  const precioIVA=isARS?c.precioTotal:(c.precioTotal/moneda.tcFinal);
-  const sym=isARS?'$':(window.MONEDAS?.[moneda.moneda]?.simbolo||moneda.moneda);
+  const tcFinal=moneda.tcFinal||1;
+  const precioVenta=isARS?c.precioNeto:(c.precioNeto/tcFinal);
+  const precioIVA=isARS?c.precioTotal:(c.precioTotal/tcFinal);
+  const ivaVal=isARS?c.iva:(c.iva/tcFinal);
+  const sym=isARS?'$':((window.MONEDAS&&window.MONEDAS[moneda.moneda]&&window.MONEDAS[moneda.moneda].simbolo)||moneda.moneda);
   const fV=v=>sym+' '+fmt(v);
+  const m2n=parseFloat(r.m2||1);
+  const totalM2=parseFloat(r.m2||0)+parseFloat(r.entrepiso||0);
 
-  // Rubros para oferta (solo CV-A agrupado por sección)
+  // Rubros agrupados por sección
   const bySection={};
-  (r.rubrosA||[]).forEach(it=>{
-    const sec=it.sectionLabel||it.section||'Otros';
+  (r.rubrosA||[]).forEach(function(it){
+    var sec=it.sectionLabel||it.section||'Otros';
     if(!bySection[sec])bySection[sec]=0;
     bySection[sec]+=it.cant*it.precio;
   });
 
-  return `
-  <style>
-    @media print {
-      .no-print{display:none!important}
-      #res-oferta{padding:0}
-      .oferta-doc{box-shadow:none!important;border:none!important}
-    }
-  </style>
-  <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
-    <button class="btn btn-navy" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
-  </div>
-  <div class="oferta-doc" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:32px;max-width:800px;margin:0 auto;font-family:Arial,sans-serif;box-shadow:0 2px 20px rgba(0,0,0,.08)">
+  // Helpers de celda
+  var H='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
+  var D='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
 
-    <!-- ENCABEZADO -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
-      <tr>
-        <td style="width:100px;vertical-align:middle">
-          <img src="data:image/png;base64,\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" style="width:80px;height:80px;border-radius:50%;object-fit:cover" />
-        </td>
-        <td style="vertical-align:middle;padding-left:16px">
-          <div style="font-size:11px;color:#666">DALI Arquitectura 360°</div>
-          <div style="font-size:10px;color:#999">dario@dali-arquitectura.com.ar</div>
-        </td>
-        <td style="text-align:right;vertical-align:middle">
-          <div style="font-size:26px;font-weight:700;color:#333;letter-spacing:.05em">OFERTA</div>
-          <div style="font-size:10px;color:#888;margin-top:3px">Formulario F-7.5.-02 Revisión 2.0</div>
-        </td>
-      </tr>
-    </table>
-    <hr style="border:none;border-top:2px solid #333;margin-bottom:18px" />
+  // Filas de rubros
+  var rubrosRows='';
+  Object.keys(bySection).forEach(function(sec){
+    var tot=bySection[sec];
+    rubrosRows+='<tr>'
+      +'<td style="'+D+'">'+escHtml(sec)+'</td>'
+      +'<td style="'+D+';text-align:right">$ '+fmt(tot)+'</td>'
+      +'<td style="'+D+';text-align:right">$ '+fmt(tot/m2n)+'</td>'
+      +'</tr>';
+  });
+  if(c.cvB>0){
+    rubrosRows+='<tr>'
+      +'<td style="'+D+'">Costos indirectos (CV-B)</td>'
+      +'<td style="'+D+';text-align:right">$ '+fmt(c.cvB)+'</td>'
+      +'<td style="'+D+';text-align:right">$ '+fmt(c.cvB/m2n)+'</td>'
+      +'</tr>';
+  }
 
-    <!-- TABLA DATOS PROYECTO -->
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">
-      <tr>
-        <td style="\${tdH}">PROYECTO N°</td>
-        <td style="\${td2}">\${r.nro||'—'}</td>
-        <td style="\${tdH}">\${r.modalidad||'ALQUILER'}</td>
-        <td style="\${tdH}">APERTURA FERIA</td>
-        <td style="\${td2}">\${r.fechaApertura||'—'}</td>
-      </tr>
-      <tr>
-        <td style="\${tdH}">CLIENTE</td>
-        <td colspan="2" style="\${td2}">\${r.cliente||'—'}</td>
-        <td style="\${tdH}">CIERRE FERIA</td>
-        <td style="\${td2}">\${r.fechaCierre||'—'}</td>
-      </tr>
-      <tr>
-        <td rowspan="2" style="\${tdH}">FERIA / EVENTO</td>
-        <td style="\${tdH}">NOMBRE</td>
-        <td style="\${td2}">\${r.evento||'—'}</td>
-        <td style="\${tdH}">INICIO MONTAJE</td>
-        <td style="\${td2}">\${r.fechaMontaje||'—'}</td>
-      </tr>
-      <tr>
-        <td style="\${tdH}">LUGAR</td>
-        <td style="\${td2}">\${r.lugar||'—'}</td>
-        <td style="\${tdH}">DESMONTAJE</td>
-        <td style="\${td2}">\${r.fechaDesmontaje||'—'}</td>
-      </tr>
-      <tr>
-        <td rowspan="2" style="\${tdH}">STAND</td>
-        <td style="\${tdH}">PREDIO/PABELL.</td>
-        <td style="\${td2}">\${r.predio||'—'}</td>
-        <td rowspan="2" style="\${tdH}">LOTE</td>
-        <td style="\${tdH2}">NÚMERO &nbsp; \${r.loteNro||'—'}</td>
-      </tr>
-      <tr>
-        <td style="\${tdH}">TIPOLOGÍA</td>
-        <td style="\${td2}">\${r.tipo||'—'}</td>
-        <td>
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <tr><td style="padding:2px 6px;font-weight:700;background:#f5f5f5;border:1px solid #ccc">FRENTE</td><td style="padding:2px 6px;border:1px solid #ccc">\${r.frente||'—'} m</td></tr>
-            <tr><td style="padding:2px 6px;font-weight:700;background:#f5f5f5;border:1px solid #ccc">FONDO</td><td style="padding:2px 6px;border:1px solid #ccc">\${r.fondo||'—'} m</td></tr>
-            <tr><td style="padding:2px 6px;font-weight:700;background:#f5f5f5;border:1px solid #ccc">PISO (M2)</td><td style="padding:2px 6px;border:1px solid #ccc">\${r.m2||0}</td></tr>
-            <tr><td style="padding:2px 6px;font-weight:700;background:#f5f5f5;border:1px solid #ccc">ENTREPISO (M2)</td><td style="padding:2px 6px;border:1px solid #ccc">\${r.entrepiso||0}</td></tr>
-            <tr><td style="padding:2px 6px;font-weight:700;background:#f5f5f5;border:1px solid #ccc">TOTAL</td><td style="padding:2px 6px;border:1px solid #ccc;font-weight:700">\${parseFloat(r.m2||0)+parseFloat(r.entrepiso||0)} m²</td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+  // Fila TC si aplica
+  var tcRow=!isARS?('<tr><td colspan="3" style="padding:4px 10px;font-size:10px;color:#888;border:1px solid #eee">'
+    +'TC '+escHtml(moneda.moneda)+': $ '+fmt(tcFinal)
+    +' · Cobertura cambiaria '+((moneda.mgCambio||0)*100).toFixed(1)+'%'
+    +'</td></tr>'):'';
 
-    <!-- DESGLOSE RUBROS -->
-    <div style="font-size:11px;font-weight:700;color:#333;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Detalle de rubros</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">
-      <tr>
-        <td style="background:#f0f0f0;padding:6px 10px;font-weight:700;border:1px solid #ccc;width:60%">Rubro</td>
-        <td style="background:#f0f0f0;padding:6px 10px;font-weight:700;border:1px solid #ccc;text-align:right">Importe</td>
-        <td style="background:#f0f0f0;padding:6px 10px;font-weight:700;border:1px solid #ccc;text-align:right">$/m²</td>
-      </tr>
-      \${Object.entries(bySection).map(([sec,tot])=>\`
-        <tr>
-          <td style="padding:5px 10px;border:1px solid #ddd">\${sec}</td>
-          <td style="padding:5px 10px;border:1px solid #ddd;text-align:right">$ \${fmt(tot)}</td>
-          <td style="padding:5px 10px;border:1px solid #ddd;text-align:right">$ \${fmt(tot/parseFloat(r.m2||1))}</td>
-        </tr>\`).join('')}
-      \${c.cvB>0?\`<tr>
-          <td style="padding:5px 10px;border:1px solid #ddd">Costos indirectos</td>
-          <td style="padding:5px 10px;border:1px solid #ddd;text-align:right">$ \${fmt(c.cvB)}</td>
-          <td style="padding:5px 10px;border:1px solid #ddd;text-align:right">$ \${fmt(c.cvB/parseFloat(r.m2||1))}</td>
-        </tr>\`:''}
-      <tr style="background:#f9f9f9">
-        <td style="padding:6px 10px;border:1px solid #ccc;font-weight:700">COSTO TOTAL (A+B)</td>
-        <td style="padding:6px 10px;border:1px solid #ccc;text-align:right;font-weight:700">$ \${fmt(c.costoTotal)}</td>
-        <td style="padding:6px 10px;border:1px solid #ccc;text-align:right;font-weight:700">$ \${fmt(c.costoTotal/parseFloat(r.m2||1))}</td>
-      </tr>
-    </table>
+  var html='<style>@media print{.no-print{display:none!important}#res-oferta{padding:0}.oferta-doc{box-shadow:none!important;border:none!important}}</style>'
+    +'<div class="no-print" style="margin-bottom:12px">'
+    +'<button class="btn btn-navy" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>'
+    +'</div>'
+    +'<div class="oferta-doc" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:32px;max-width:800px;margin:0 auto;font-family:Arial,sans-serif;box-shadow:0 2px 20px rgba(0,0,0,.08)">'
 
-    <!-- PRECIO DE VENTA -->
-    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">
-      <tr>
-        <td style="padding:8px 12px;border:2px solid #333;font-weight:700;font-size:14px">PRECIO DE VENTA (sin IVA)</td>
-        <td style="padding:8px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:16px;color:#333">\${fV(precioVenta)}</td>
-        <td style="padding:8px 12px;border:2px solid #333;text-align:right;color:#666;font-size:12px">\${sym} \${fmt(precioVenta/parseFloat(r.m2||1))}/m²</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 12px;border:1px solid #ddd;color:#666">IVA 21%</td>
-        <td style="padding:6px 12px;border:1px solid #ddd;text-align:right;color:#666">\${fV(isARS?c.iva:c.iva/moneda.tcFinal)}</td>
-        <td style="padding:6px 12px;border:1px solid #ddd"></td>
-      </tr>
-      <tr style="background:#f0f0f0">
-        <td style="padding:8px 12px;border:2px solid #333;font-weight:700">PRECIO TOTAL + IVA</td>
-        <td style="padding:8px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:15px">\${fV(precioIVA)}</td>
-        <td style="padding:8px 12px;border:2px solid #333"></td>
-      </tr>
-      \${!isARS?\`<tr><td colspan="3" style="padding:5px 12px;font-size:11px;color:#888;border:1px solid #eee">TC \${moneda.moneda}: $ \${fmt(moneda.tcFinal)} · Cobertura cambiaria \${((moneda.mgCambio||0)*100).toFixed(1)}%</td></tr>\`:''}
-    </table>
+    // Encabezado
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:18px"><tr>'
+    +'<td style="width:90px;vertical-align:middle">'
+    +'<img src="data:image/png;base64,'+LOGO+'" style="width:75px;height:75px;border-radius:50%;object-fit:cover" />'
+    +'</td>'
+    +'<td style="vertical-align:middle;padding-left:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:#333">DALI Arquitectura 360°</div>'
+    +'<div style="font-size:10px;color:#888;margin-top:2px">dario@dali-arquitectura.com.ar</div>'
+    +'</td>'
+    +'<td style="text-align:right;vertical-align:middle">'
+    +'<div style="font-size:28px;font-weight:700;color:#333;letter-spacing:.05em">OFERTA</div>'
+    +'<div style="font-size:10px;color:#888;margin-top:2px">Formulario F-7.5.-02 Revisión 2.0</div>'
+    +'</td>'
+    +'</tr></table>'
+    +'<hr style="border:none;border-top:2px solid #333;margin-bottom:18px" />'
 
-    <!-- OBSERVACIONES -->
-    <div style="font-size:11px;font-weight:700;color:#333;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Observaciones</div>
-    <div style="font-size:11px;color:#555;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:50px;line-height:1.6">
-      \${r.brief||''}
-    </div>
+    // Tabla datos proyecto
+    +'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:18px">'
+    +'<tr>'
+    +'<td style="'+H+';width:90px">PROYECTO N°</td>'
+    +'<td style="'+D+'">'+escHtml(r.nro||'—')+'</td>'
+    +'<td style="'+H+'">'+escHtml(r.modalidad||'ALQUILER')+'</td>'
+    +'<td style="'+H+'">APERTURA FERIA</td>'
+    +'<td style="'+D+'">'+escHtml(r.fechaApertura||'—')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="'+H+'">CLIENTE</td>'
+    +'<td colspan="2" style="'+D+'">'+escHtml(r.cliente||'—')+'</td>'
+    +'<td style="'+H+'">CIERRE FERIA</td>'
+    +'<td style="'+D+'">'+escHtml(r.fechaCierre||'—')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td rowspan="2" style="'+H+'">FERIA / EVENTO</td>'
+    +'<td style="'+H+'">NOMBRE</td>'
+    +'<td style="'+D+'">'+escHtml(r.evento||'—')+'</td>'
+    +'<td style="'+H+'">INICIO MONTAJE</td>'
+    +'<td style="'+D+'">'+escHtml(r.fechaMontaje||'—')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="'+H+'">LUGAR</td>'
+    +'<td style="'+D+'">'+escHtml(r.lugar||'—')+'</td>'
+    +'<td style="'+H+'">DESMONTAJE</td>'
+    +'<td style="'+D+'">'+escHtml(r.fechaDesmontaje||'—')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td rowspan="3" style="'+H+'">STAND</td>'
+    +'<td style="'+H+'">PREDIO/PABELL.</td>'
+    +'<td style="'+D+'">'+escHtml(r.predio||'—')+'</td>'
+    +'<td rowspan="3" style="'+H+';text-align:center">LOTE</td>'
+    +'<td style="'+H+'">NÚMERO: '+escHtml(r.loteNro||'—')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="'+H+'">TIPOLOGÍA</td>'
+    +'<td style="'+D+'">'+escHtml(r.tipo||'—')+'</td>'
+    +'<td>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<tr><td style="'+H+'">FRENTE</td><td style="'+D+'">'+escHtml(r.frente||'—')+' m</td></tr>'
+    +'<tr><td style="'+H+'">FONDO</td><td style="'+D+'">'+escHtml(r.fondo||'—')+' m</td></tr>'
+    +'<tr><td style="'+H+'">PISO (M²)</td><td style="'+D+'">'+escHtml(r.m2||'0')+'</td></tr>'
+    +'<tr><td style="'+H+'">ENTREPISO (M²)</td><td style="'+D+'">'+escHtml(r.entrepiso||'0')+'</td></tr>'
+    +'<tr><td style="'+H+'">TOTAL</td><td style="'+D+';font-weight:700">'+totalM2+' m²</td></tr>'
+    +'</table>'
+    +'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="'+H+'">N° PROYECTO</td>'
+    +'<td style="'+D+'">'+escHtml(r.nro||'—')+'</td>'
+    +'<td></td>'
+    +'</tr>'
+    +'</table>'
 
-    <!-- PIE -->
-    <div style="margin-top:24px;padding-top:14px;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:flex-end">
-      <div style="font-size:10px;color:#999">
-        <div>Precios NO incluyen IVA. Domingos y feriados: 30% de recargo.</div>
-        <div>Trabajos en altura mayor a 3m: 50% de recargo.</div>
-        <div>Trabajos con menos de 5 días de anticipación: 30% de recargo.</div>
-      </div>
-      <div style="text-align:right;font-size:11px;color:#666">
-        <div style="margin-bottom:30px">Firma y aclaración</div>
-        <div style="border-top:1px solid #333;padding-top:4px">DALI Arquitectura 360°</div>
-      </div>
-    </div>
+    // Detalle rubros
+    +'<div style="font-size:11px;font-weight:700;color:#333;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Detalle de rubros</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">'
+    +'<tr>'
+    +'<td style="'+H+';width:55%">Rubro</td>'
+    +'<td style="'+H+';text-align:right">Importe</td>'
+    +'<td style="'+H+';text-align:right">$/m²</td>'
+    +'</tr>'
+    +rubrosRows
+    +'<tr style="background:#f9f9f9">'
+    +'<td style="padding:6px 8px;border:1px solid #ccc;font-weight:700;font-size:12px">COSTO TOTAL (A+B)</td>'
+    +'<td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:700">$ '+fmt(c.costoTotal)+'</td>'
+    +'<td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:700">$ '+fmt(c.costoTotal/m2n)+'</td>'
+    +'</tr>'
+    +'</table>'
 
-  </div>`;
+    // Precio de venta
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">'
+    +'<tr>'
+    +'<td style="padding:9px 12px;border:2px solid #333;font-weight:700;font-size:14px;width:45%">PRECIO DE VENTA (sin IVA)</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:17px">'+fV(precioVenta)+'</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;color:#666;font-size:11px">'+sym+' '+fmt(precioVenta/m2n)+'/m²</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="padding:6px 12px;border:1px solid #ddd;color:#666">IVA 21%</td>'
+    +'<td style="padding:6px 12px;border:1px solid #ddd;text-align:right;color:#666">'+fV(ivaVal)+'</td>'
+    +'<td style="padding:6px 12px;border:1px solid #ddd"></td>'
+    +'</tr>'
+    +'<tr style="background:#f0f0f0">'
+    +'<td style="padding:9px 12px;border:2px solid #333;font-weight:700">PRECIO TOTAL + IVA</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:15px">'+fV(precioIVA)+'</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333"></td>'
+    +'</tr>'
+    +tcRow
+    +'</table>'
+
+    // Observaciones
+    +'<div style="font-size:11px;font-weight:700;color:#333;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Observaciones</div>'
+    +'<div style="font-size:11px;color:#555;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:50px;line-height:1.6">'+escHtml(r.brief||'')+'</div>'
+
+    // Pie
+    +'<div style="margin-top:24px;padding-top:14px;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:flex-end">'
+    +'<div style="font-size:10px;color:#999;line-height:1.6">'
+    +'<div>Precios NO incluyen IVA.</div>'
+    +'<div>Domingos y feriados: 30% de recargo.</div>'
+    +'<div>Trabajos en altura mayor a 3m: 50% de recargo.</div>'
+    +'<div>Trabajos solicitados con menos de 5 días de anticipación: 30% de recargo.</div>'
+    +'</div>'
+    +'<div style="text-align:right;font-size:11px;color:#666">'
+    +'<div style="margin-bottom:28px">Firma y aclaración</div>'
+    +'<div style="border-top:1px solid #333;padding-top:4px">DALI Arquitectura 360°</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+  return html;
 }
 
-const tdH='padding:5px 8px;font-weight:700;background:#f5f5f5;border:1px solid #ccc;font-size:11px';
-const td2='padding:5px 8px;border:1px solid #ccc;font-size:11px';
-const tdH2='padding:5px 8px;font-weight:700;background:#f5f5f5;border:1px solid #ccc;font-size:11px';
 
 function renderProposal(p,i){
   return `<div class="proposal-card">
