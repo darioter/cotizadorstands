@@ -2618,24 +2618,19 @@ function printOferta(){
 
 function printContent(el){
   if(!el)return;
-  // Abrir ventana nueva con solo el contenido del elemento
-  const win=window.open('','_print_','width=900,height=700');
-  if(!win)return;
-  // Copiar estilos del documento
-  const styles=Array.from(document.styleSheets).map(ss=>{
-    try{return Array.from(ss.cssRules).map(r=>r.cssText).join('\n');}
-    catch(e){return '';}
-  }).join('\n');
-  win.document.write(
-    '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<style>'+styles+'body{background:#fff;padding:20px;margin:0;font-family:Arial,sans-serif}</style>'
-    +'</head><body>'
-    +el.innerHTML
-    +'</body></html>'
-  );
-  win.document.close();
-  win.focus();
-  setTimeout(()=>{win.print();win.close();},600);
+  // Guardar estado actual del body
+  const origBody=document.body.innerHTML;
+  const origTitle=document.title;
+  // Reemplazar body con solo el contenido a imprimir
+  document.body.innerHTML='<div style="padding:0;margin:0;background:#fff">'+el.innerHTML+'</div>';
+  document.title='DALI — Cotización';
+  // Imprimir
+  window.print();
+  // Restaurar
+  document.body.innerHTML=origBody;
+  document.title=origTitle;
+  // Restaurar event listeners (la app necesita reiniciar)
+  location.reload();
 }
 
 // ── UTILS ──
