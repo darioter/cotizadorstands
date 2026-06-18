@@ -951,22 +951,11 @@ async function loadCatalog(){
 async function savePrecios(){
   const btn=document.getElementById('btn-save-precios');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
-
   const rubro=currentPreciosTab;
   const items=preciosCatalog[rubro]||[];
-  const logEl=showSaveLog('Iniciando guardado de rubro: '+rubro+' ('+items.length+' ítems)');
-
   try{
-    // PASO 1: DELETE
-    addLog(logEl,'DELETE rubro '+rubro+'...');
     const delResp=await sb.from('catalogo').delete().eq('rubro',rubro);
-    if(delResp.error){
-      addLog(logEl,'❌ DELETE error: '+delResp.error.message+' (code: '+delResp.error.code+')');
-      throw new Error('DELETE falló: '+delResp.error.message);
-    }
-    addLog(logEl,'✓ DELETE OK');
-
-    // PASO 2: INSERT
+    if(delResp.error) throw new Error('Error al borrar: '+delResp.error.message);
     if(items.length>0){
       const rows=items.map((it,i)=>({
         id: rubro+'_'+String(i).padStart(3,'0'),
@@ -979,53 +968,18 @@ async function savePrecios(){
         updated_by: currentUser.id,
         updated_at: new Date().toISOString()
       }));
-      addLog(logEl,'INSERT '+rows.length+' filas...');
-      addLog(logEl,'Primer row: '+JSON.stringify(rows[0]));
       const insResp=await sb.from('catalogo').insert(rows);
-      if(insResp.error){
-        addLog(logEl,'❌ INSERT error: '+insResp.error.message+' (code: '+insResp.error.code+')');
-        throw new Error('INSERT falló: '+insResp.error.message);
-      }
-      addLog(logEl,'✓ INSERT OK');
+      if(insResp.error) throw new Error('Error al insertar: '+insResp.error.message);
       preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
     }
-
-    // PASO 3: verificar lo que quedó en Supabase
-    const checkResp=await sb.from('catalogo').select('id,label,precio').eq('rubro',rubro).order('orden');
-    addLog(logEl,'✓ Verificación: '+checkResp.data?.length+' filas en Supabase');
-    if(checkResp.data?.length>0){
-      addLog(logEl,'Primera fila guardada: '+JSON.stringify(checkResp.data[0]));
-    }
-
+    toast('✓ Rubro guardado','success');
     if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
-    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar rubro';btn.disabled=false;}},3000);
+    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar rubro';btn.disabled=false;}},2500);
   }catch(e){
-    addLog(logEl,'❌ EXCEPCION: '+e.message);
+    console.error('savePrecios:',e);
     toast('Error: '+e.message,'error');
     if(btn){btn.disabled=false;btn.textContent='Guardar rubro';}
   }
-}
-
-function showSaveLog(msg){
-  let logDiv=document.getElementById('save-log');
-  if(!logDiv){
-    logDiv=document.createElement('div');
-    logDiv.id='save-log';
-    logDiv.style.cssText='position:fixed;bottom:80px;right:16px;background:#1B2A3B;color:#A0B4C8;font-size:10px;font-family:monospace;border-radius:8px;padding:10px 14px;z-index:9999;max-width:380px;max-height:200px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.4)';
-    document.body.appendChild(logDiv);
-    setTimeout(()=>{if(logDiv)logDiv.remove();},15000);
-  }
-  logDiv.innerHTML='';
-  addLog(logDiv,msg);
-  return logDiv;
-}
-function addLog(el,msg){
-  if(!el)return;
-  const line=document.createElement('div');
-  line.textContent=new Date().toLocaleTimeString('es-AR')+' '+msg;
-  line.style.cssText='padding:1px 0;border-bottom:1px solid rgba(255,255,255,.05)';
-  el.appendChild(line);
-  el.scrollTop=el.scrollHeight;
 }
 
 
