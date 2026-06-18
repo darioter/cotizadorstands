@@ -446,6 +446,7 @@ small{font-size:10px;color:#999}
           <button class="tab" onclick="preciosTab('grafica',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Gráfica</button>
           <button class="tab" onclick="preciosTab('equipamiento',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Mobil.</button>
           <button class="tab" onclick="preciosTab('audiovisual',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">AV</button>
+          <button class="tab" onclick="preciosTab('entelados',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">🧵 Entelados</button>
           <button class="tab" onclick="preciosTab('otros',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Otros</button>
           <button class="tab" onclick="preciosTab('indirectos',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">CV-B</button>
         </div>
@@ -721,6 +722,27 @@ const DEFAULT_CATALOG={
     {id:'b5',label:'Varios e imprevistos',unit:'global',precio:0},
     {id:'b6',label:'Encomienda profesional',unit:'global',precio:0}
   ],
+  entelados:[
+    {id:'en1',label:'Set de poliéster — provisión y colocación',unit:'m lineal',precio:26000},
+    {id:'en2',label:'Set de poliéster — provisión y colocación',unit:'m²',precio:17000},
+    {id:'en3',label:'Set de poliéster y nylon — provisión y colocación',unit:'m lineal',precio:31000},
+    {id:'en4',label:'Set de poliéster y nylon — provisión y colocación',unit:'m²',precio:20000},
+    {id:'en5',label:'Tela impresa — solo colocación',unit:'m lineal',precio:18000},
+    {id:'en6',label:'Tela impresa — solo colocación',unit:'m²',precio:12000},
+    {id:'en7',label:'Tela impresa con nylon — solo colocación',unit:'m lineal',precio:22000},
+    {id:'en8',label:'Tela impresa con nylon — solo colocación',unit:'m²',precio:14000},
+    {id:'en9',label:'Tela impresa con nylon — solo provisión y confección',unit:'m lineal',precio:18000},
+    {id:'en10',label:'Tela impresa con nylon — solo provisión y confección',unit:'m²',precio:12000},
+    {id:'en11',label:'Tela voile',unit:'m lineal',precio:25000},
+    {id:'en12',label:'Tela voile',unit:'m²',precio:12000},
+    {id:'en13',label:'Bastidor entelado (listones 1x1) — mín 10m',unit:'m²',precio:36000},
+    {id:'en14',label:'Bastidor entelado (listones 2x1) — mín 10m',unit:'m²',precio:45000},
+    {id:'en15',label:'Cortinas de hilo',unit:'m²',precio:50000},
+    {id:'en16',label:'Alquiler telón hasta 3,00m altura',unit:'m lineal',precio:45000},
+    {id:'en17',label:'Alquiler telón hasta 5,00m altura',unit:'m lineal',precio:60000},
+    {id:'en18',label:'Alquiler telón hasta 6,50m altura',unit:'m lineal',precio:70000},
+    {id:'en19',label:'Alquiler telón hasta 11,00m altura',unit:'m lineal',precio:75000},
+  ],
 };
 
 const RUBRO_SECTIONS=[
@@ -731,6 +753,7 @@ const RUBRO_SECTIONS=[
   {key:'grafica',label:'🖨 Gráfica'},
   {key:'equipamiento',label:'🪑 Equipamiento / Mobiliario'},
   {key:'audiovisual',label:'📺 Audio y video'},
+  {key:'entelados',label:'🧵 Entelados'},
   {key:'otros',label:'📦 Otros / Servicios'},
 ];
 
