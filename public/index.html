@@ -492,7 +492,7 @@ small{font-size:10px;color:#999}
           <button class="tab" onclick="preciosTab('audiovisual',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#1A7A8A">📺 AV</button>
           <button class="tab" onclick="preciosTab('entelados',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#3A8A5C">🧵 Entelados</button>
           <button class="tab" onclick="preciosTab('otros',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#6A6A6A">📦 Otros</button>
-          <button class="tab" onclick="preciosTab('indirectos',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#8A3A3A">📋 CV-B</button>
+
         </div>
         <div id="precios-content"></div>
         <div style="padding:8px 14px;border-top:1px solid var(--border)">
@@ -1601,7 +1601,7 @@ function renderPIPRubrosB(){
     cont.appendChild(row);
   });
 
-  // Selector agregar CV-B
+  // Selector CV-B — siempre desde DEFAULT_CATALOG (no desde Supabase)
   const addRow=document.createElement('div');
   addRow.style.cssText='padding:6px 12px 8px;display:flex;gap:6px;align-items:center';
   const sel=document.createElement('select');
@@ -1609,7 +1609,8 @@ function renderPIPRubrosB(){
   const defOpt=document.createElement('option');
   defOpt.value='';defOpt.textContent='+ Agregar costo indirecto...';sel.appendChild(defOpt);
 
-  (preciosCatalog.indirectos||DEFAULT_CATALOG.indirectos).forEach((it,ci)=>{
+  // Siempre desde DEFAULT_CATALOG — son conceptos fijos, el monto se carga por proyecto
+  DEFAULT_CATALOG.indirectos.forEach((it,ci)=>{
     const opt=document.createElement('option');opt.value=ci;
     opt.textContent=it.label;sel.appendChild(opt);
   });
@@ -1620,7 +1621,7 @@ function renderPIPRubrosB(){
     if(val==='__manual__'){
       pipRubrosB.push({id:'new'+Date.now(),label:'',precio:0,cant:1});
     } else {
-      const it=(preciosCatalog.indirectos||DEFAULT_CATALOG.indirectos)[parseInt(val)];
+      const it=DEFAULT_CATALOG.indirectos[parseInt(val)];
       if(it) pipRubrosB.push({id:it.id||('b'+Math.random()),label:it.label,precio:0,cant:1});
     }
     sel.value='';renderPIPRubrosB();
