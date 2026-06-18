@@ -967,10 +967,9 @@ function makeItemId(rubro, label){
 async function saveRubro(rubro){
   const items=preciosCatalog[rubro]||[];
 
+  // Generar filas con IDs estables
   const rows=items.map((it,i)=>{
-    // Si el ítem ya tiene un ID fijo de Supabase (no es 'new_xxx'), lo conservamos
-    // Si es nuevo o tiene ID temporal, generamos uno desde el label
-    const stableId=(it.id&&!String(it.id).startsWith('new')&&!String(it.id).match(/_idx\d+$/))
+    const stableId=(it.id && !String(it.id).startsWith('new') && !String(it.id).includes('_idx'))
       ? it.id
       : makeItemId(rubro, it.label||('item'+i));
     return {
@@ -986,25 +985,24 @@ async function saveRubro(rubro){
     };
   });
 
+  // 1. Upsert los ítems actuales
   if(rows.length>0){
     const{error}=await sb.from('catalogo').upsert(rows,{onConflict:'id'});
-    if(error)throw new Error(error.message);
+    if(error) throw new Error('Upsert error: '+error.message);
   }
 
-  // Eliminar físicamente de Supabase los ítems que el usuario quitó con ×
-  // (los que estaban en Supabase pero ya no están en el array actual)
-  const activeIds=rows.map(r=>r.id);
-  if(activeIds.length>0){
-    await sb.from('catalogo')
-      .delete()
-      .eq('rubro',rubro)
-      .not('id','in','('+activeIds.map(id=>"'"+id+"'").join(',')+')');
-  } else {
-    // Si el rubro quedó vacío, eliminar todo
-    await sb.from('catalogo').delete().eq('rubro',rubro);
+  // 2. Eliminar los que ya no están: traer IDs actuales en Supabase para este rubro
+  //    y borrar los que no están en el array nuevo
+  const{data:existentes}=await sb.from('catalogo').select('id').eq('rubro',rubro);
+  if(existentes&&existentes.length>0){
+    const activeIds=new Set(rows.map(r=>r.id));
+    const toDelete=existentes.filter(e=>!activeIds.has(e.id)).map(e=>e.id);
+    for(const delId of toDelete){
+      await sb.from('catalogo').delete().eq('id',delId);
+    }
   }
 
-  // Sincronizar IDs estables en memoria
+  // 3. Sincronizar IDs en memoria
   preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
 }
 
