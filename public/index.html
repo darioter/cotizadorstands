@@ -292,7 +292,16 @@ small{font-size:10px;color:#999}
             <div class="mb-10"><label class="field-label">Cliente *</label><input type="text" id="pip-cliente" placeholder="Nombre del cliente" /></div>
             <div class="grid-2 mb-10">
               <div><label class="field-label">Nombre del proyecto</label><input type="text" id="pip-nombre" placeholder="Ej: Stand Novozymes — Expoagro 2026" /></div>
-              <div><label class="field-label">Pauta del cliente ($)</label><input type="number" id="pip-pauta" placeholder="Tope presupuestario" /></div>
+              <div>
+  <label class="field-label">Pauta del cliente ($)</label>
+  <div style="position:relative">
+    <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#888;font-size:13px;pointer-events:none">$</span>
+    <input type="text" id="pip-pauta" placeholder="0" inputmode="numeric"
+      style="padding-left:22px"
+      oninput="formatPauta(this)"
+      onblur="formatPauta(this)" />
+  </div>
+</div>
             </div>
             <!-- Feria/Evento -->
             <div style="font-size:10px;font-weight:700;color:var(--navy);letter-spacing:.05em;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid var(--border)">Feria / Evento</div>
@@ -1746,7 +1755,7 @@ function calcularPrecio(){
 
   const calc=calcPrecioVenta(cvA,cvB,parametros);
   const m2=parseFloat(document.getElementById('pip-m2').value)||1;
-  const pauta=document.getElementById('pip-pauta').value;
+  const pauta=getPautaValue();
   const pautaOk=pauta&&parseFloat(pauta)>0;
   const enPauta=pautaOk&&calc.precioNeto<=parseFloat(pauta);
 
@@ -2576,86 +2585,57 @@ function renderMonedaBox(mon,c,monSym){
     +'</div></div>';
 }
 
+// ── FORMATO MONEDA ──
+function formatPauta(inp){
+  // Remover todo lo que no sea número
+  const raw=inp.value.replace(/[^0-9]/g,'');
+  if(!raw){inp.value='';inp.dataset.raw='0';return;}
+  const num=parseInt(raw,10);
+  inp.dataset.raw=String(num);
+  // Formatear con separadores de miles
+  inp.value=num.toLocaleString('es-AR');
+}
+function getPautaValue(){
+  const inp=document.getElementById('pip-pauta');
+  if(!inp)return '';
+  const raw=inp.dataset.raw||(inp.value.replace(/[^0-9]/g,'')||'0');
+  return raw;
+}
+
 // ── PRINT ──
 function printActiveTab(){
-  // Encontrar el tab activo
   const activeTab=document.querySelector('#res-tabs .tab.active');
-  if(!activeTab)return window.print();
-  const tabId=activeTab.getAttribute('onclick').match(/'([^']+)'/)?.[1];
-  if(tabId==='oferta'){printOferta();return;}
-
-  // Para otros tabs: mostrar solo el div activo
-  const allDivs=['res-precio','res-rubros','res-propuestas','res-oferta'];
-  const targetId='res-'+tabId;
-
-  // Marcar el div activo para impresión
-  allDivs.forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){
-      if(id===targetId){el.classList.add('print-target');}
-      else{el.classList.add('print-hide');}
-    }
-  });
-
-  // Ocultar summary bar y tabs durante impresión
-  const toHide=[
-    document.querySelector('.summary-bar'),
-    document.getElementById('res-tabs'),
-    document.querySelector('#pip-result > div:first-child'), // botones top
-  ].filter(Boolean);
-  toHide.forEach(el=>el.classList.add('print-hide'));
-
-  // CSS temporal
-  const style=document.createElement('style');
-  style.id='print-temp-style';
-  style.textContent=`
-    @media print{
-      .print-hide{display:none!important}
-      .print-target{display:block!important}
-      header,#bottom-nav,.no-print{display:none!important}
-      body,main{padding:0!important;margin:0!important;background:#fff!important;max-width:100%!important}
-    }
-  `;
-  document.head.appendChild(style);
-
-  window.print();
-
-  // Limpiar después de imprimir
-  setTimeout(()=>{
-    allDivs.forEach(id=>{
-      const el=document.getElementById(id);
-      if(el){el.classList.remove('print-target','print-hide');}
-    });
-    toHide.forEach(el=>el.classList.remove('print-hide'));
-    const s=document.getElementById('print-temp-style');
-    if(s)s.remove();
-  },1000);
+  if(!activeTab){printContent(document.getElementById('pip-result'));return;}
+  const onclick=activeTab.getAttribute('onclick')||'';
+  const tabId=onclick.match(/'([^']+)'/)?.[1];
+  const targetEl=document.getElementById('res-'+(tabId||'precio'));
+  printContent(targetEl);
 }
 
 function printOferta(){
-  // Solo imprimir el documento de oferta
-  const ofertaEl=document.getElementById('res-oferta');
-  if(!ofertaEl)return;
+  printContent(document.getElementById('res-oferta'));
+}
 
-  const style=document.createElement('style');
-  style.id='print-temp-style';
-  style.textContent=`
-    @media print{
-      body > *:not(#app){display:none!important}
-      header,#bottom-nav{display:none!important}
-      main > *{display:none!important}
-      #view-pip{display:block!important}
-      #pip-result{display:block!important}
-      #pip-result > *{display:none!important}
-      #res-oferta{display:block!important}
-      .no-print{display:none!important}
-      .oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:16px 20px!important;max-width:100%!important;margin:0!important}
-      body,main{padding:0!important;margin:0!important;background:#fff!important;max-width:100%!important}
-    }
-  `;
-  document.head.appendChild(style);
-  window.print();
-  setTimeout(()=>{const s=document.getElementById('print-temp-style');if(s)s.remove();},1000);
+function printContent(el){
+  if(!el)return;
+  // Abrir ventana nueva con solo el contenido del elemento
+  const win=window.open('','_print_','width=900,height=700');
+  if(!win)return;
+  // Copiar estilos del documento
+  const styles=Array.from(document.styleSheets).map(ss=>{
+    try{return Array.from(ss.cssRules).map(r=>r.cssText).join('\n');}
+    catch(e){return '';}
+  }).join('\n');
+  win.document.write(
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<style>'+styles+'body{background:#fff;padding:20px;margin:0;font-family:Arial,sans-serif}</style>'
+    +'</head><body>'
+    +el.innerHTML
+    +'</body></html>'
+  );
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{win.print();win.close();},600);
 }
 
 // ── UTILS ──
