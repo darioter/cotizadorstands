@@ -1940,42 +1940,52 @@ function renderOferta(res,c,m2,monSym,fmtM){
   var fV=function(v){return sym+' '+fmt(v);};
   var m2n=parseFloat(r.m2||1);
 
-  // Ítems detallados (label + cant + precio)
-  var itemsRows='';
+  // Agrupar ítems por sección (sectionLabel) manteniendo orden
+  var sections=[];
+  var secMap={};
   (r.rubrosA||[]).forEach(function(it){
-    var subtot=it.cant*it.precio;
-    if(subtot<=0)return;
-    itemsRows+='<tr>'
-      +'<td style="'+D+'">'+escHtml(it.label)+'</td>'
-      +'<td style="'+D+';text-align:center">'+it.cant+' '+escHtml(it.unit||'u')+'</td>'
-      +'<td style="'+D+';text-align:right">$ '+fmt(it.precio)+'</td>'
-      +'<td style="'+D+';text-align:right">$ '+fmt(subtot)+'</td>'
-      +'</tr>';
+    if(it.cant<=0)return;
+    var sec=it.sectionLabel||it.section||'Otros';
+    // Limpiar emoji del label de sección
+    var secClean=sec.replace(/^\S+\s/,'').toUpperCase();
+    if(!secMap[sec]){secMap[sec]={label:secClean,items:[]};sections.push(secMap[sec]);}
+    secMap[sec].items.push(it);
   });
-  if((r.rubrosB||[]).some(function(it){return it.precio>0;})){
-    (r.rubrosB||[]).forEach(function(it){
-      if(it.precio<=0)return;
-      itemsRows+='<tr>'
-        +'<td style="'+D+'">'+escHtml(it.label)+'</td>'
-        +'<td style="'+D+';text-align:center">—</td>'
-        +'<td style="'+D+';text-align:right">—</td>'
-        +'<td style="'+D+';text-align:right">$ '+fmt(it.precio)+'</td>'
-        +'</tr>';
-    });
+  // CV-B si tiene ítems
+  var bItems=(r.rubrosB||[]).filter(function(it){return it.precio>0;});
+  if(bItems.length>0){
+    sections.push({label:'OTROS / INDIRECTOS',items:bItems.map(function(it){return {label:it.label,cant:1,unit:'global'};})});
   }
 
+  // Construir filas del detalle
+  var detalleRows='';
+  sections.forEach(function(sec){
+    // Lista de ítems como texto descriptivo
+    var itemsList=sec.items.map(function(it){
+      var qty=it.cant&&it.cant>1?(it.cant+' '+escHtml(it.unit||'u')+' '):'';
+      return qty+escHtml(it.label);
+    }).join(' / ');
+    detalleRows+='<tr>'
+      +'<td style="padding:6px 10px;border:1px solid #ddd;font-weight:700;font-size:11px;background:#f8f8f8;white-space:nowrap;vertical-align:top;width:22%">'+sec.label+'</td>'
+      +'<td style="padding:6px 10px;border:1px solid #ddd;font-size:11px;vertical-align:top;line-height:1.6">'+itemsList+'</td>'
+      +'</tr>';
+  });
+
   // Fila TC si moneda extranjera
-  var tcRow=!isARS?('<tr><td colspan="4" style="padding:4px 10px;font-size:10px;color:#888;border:1px solid #eee">'
+  var tcNote=!isARS?('<div style="font-size:10px;color:#888;margin-top:4px">'
     +'TC '+escHtml(moneda.moneda)+': $ '+fmt(tcFinal)
     +' · Cobertura cambiaria '+((moneda.mgCambio||0)*100).toFixed(1)+'%'
-    +'</td></tr>'):'';
+    +'</div>'):'';
+
+  var H2='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
+  var D2='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
 
   var html=''
     +'<style>'
     +'@media print{'
     +'.no-print{display:none!important}'
     +'#res-oferta,main{padding:0!important;margin:0!important}'
-    +'.oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:24px!important}'
+    +'.oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:20px 28px!important;max-width:100%!important}'
     +'header,#bottom-nav,.tabs{display:none!important}'
     +'}'
     +'</style>'
@@ -1985,9 +1995,9 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +'<div class="oferta-doc" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:28px 32px;max-width:760px;margin:0 auto;font-family:Arial,sans-serif;box-shadow:0 2px 20px rgba(0,0,0,.08)">'
 
     // Encabezado
-    +'<table style="width:100%;border-collapse:collapse;margin-bottom:16px"><tr>'
-    +'<td style="width:80px;vertical-align:middle">'
-    +'<img src="data:image/png;base64,'+DALI_LOGO+'" style="width:70px;height:70px;border-radius:50%;object-fit:cover" />'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tr>'
+    +'<td style="width:76px;vertical-align:middle">'
+    +'<img src="data:image/png;base64,'+DALI_LOGO+'" style="width:68px;height:68px;border-radius:50%;object-fit:cover" />'
     +'</td>'
     +'<td style="vertical-align:middle;padding-left:12px">'
     +'<div style="font-size:13px;font-weight:700;color:#333">DALI Arquitectura 360°</div>'
@@ -1997,102 +2007,98 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +'<div style="font-size:30px;font-weight:700;color:#333;letter-spacing:.06em">OFERTA</div>'
     +'</td>'
     +'</tr></table>'
-    +'<hr style="border:none;border-top:2px solid #333;margin-bottom:16px" />'
+    +'<hr style="border:none;border-top:2px solid #333;margin-bottom:14px" />'
 
-    // Tabla datos — layout fijo
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px;table-layout:fixed">'
-    // Fila 1: Proyecto N°
+    // Tabla datos proyecto — table-layout fixed con anchos definidos
+    +'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:14px;table-layout:fixed">'
+    +'<colgroup>'
+    +'<col style="width:100px"/><col style="width:130px"/><col style="width:75px"/>'
+    +'<col style="width:105px"/><col/>'
+    +'</colgroup>'
     +'<tr>'
-    +'<td style="'+H+';width:100px">PROYECTO N°</td>'
-    +'<td style="'+D+';width:130px">'+escHtml(r.nro||'—')+'</td>'
-    +'<td style="'+H+';width:80px">'+escHtml(r.modalidad||'ALQUILER')+'</td>'
-    +'<td style="'+H+';width:110px">APERTURA FERIA</td>'
-    +'<td style="'+D+'">'+escHtml(r.fechaApertura||'—')+'</td>'
+    +'<td style="'+H2+'">PROYECTO N°</td>'
+    +'<td style="'+D2+'">'+escHtml(r.nro||'—')+'</td>'
+    +'<td style="'+H2+'">'+escHtml(r.modalidad||'ALQUILER')+'</td>'
+    +'<td style="'+H2+'">APERTURA FERIA</td>'
+    +'<td style="'+D2+'">'+escHtml(r.fechaApertura||'—')+'</td>'
     +'</tr>'
-    // Fila 2: Cliente
     +'<tr>'
-    +'<td style="'+H+'">CLIENTE</td>'
-    +'<td colspan="2" style="'+D+'">'+escHtml(r.cliente||'—')+'</td>'
-    +'<td style="'+H+'">CIERRE FERIA</td>'
-    +'<td style="'+D+'">'+escHtml(r.fechaCierre||'—')+'</td>'
+    +'<td style="'+H2+'">CLIENTE</td>'
+    +'<td colspan="2" style="'+D2+'">'+escHtml(r.cliente||'—')+'</td>'
+    +'<td style="'+H2+'">CIERRE FERIA</td>'
+    +'<td style="'+D2+'">'+escHtml(r.fechaCierre||'—')+'</td>'
     +'</tr>'
-    // Fila 3: Feria nombre
     +'<tr>'
-    +'<td rowspan="2" style="'+H+'">FERIA / EVENTO</td>'
-    +'<td style="'+H+'">NOMBRE</td>'
-    +'<td style="'+D+'">'+escHtml(r.evento||'—')+'</td>'
-    +'<td style="'+H+'">INICIO MONTAJE</td>'
-    +'<td style="'+D+'">'+escHtml(r.fechaMontaje||'—')+'</td>'
+    +'<td rowspan="2" style="'+H2+'">FERIA / EVENTO</td>'
+    +'<td style="'+H2+'">NOMBRE</td>'
+    +'<td style="'+D2+'">'+escHtml(r.evento||'—')+'</td>'
+    +'<td style="'+H2+'">INICIO MONTAJE</td>'
+    +'<td style="'+D2+'">'+escHtml(r.fechaMontaje||'—')+'</td>'
     +'</tr>'
-    // Fila 4: Feria lugar
     +'<tr>'
-    +'<td style="'+H+'">LUGAR</td>'
-    +'<td style="'+D+'">'+escHtml(r.lugar||'—')+'</td>'
-    +'<td style="'+H+'">DESMONTAJE</td>'
-    +'<td style="'+D+'">'+escHtml(r.fechaDesmontaje||'—')+'</td>'
+    +'<td style="'+H2+'">LUGAR</td>'
+    +'<td style="'+D2+'">'+escHtml(r.lugar||'—')+'</td>'
+    +'<td style="'+H2+'">DESMONTAJE</td>'
+    +'<td style="'+D2+'">'+escHtml(r.fechaDesmontaje||'—')+'</td>'
     +'</tr>'
-    // Fila 5: Stand predio
     +'<tr>'
-    +'<td rowspan="2" style="'+H+'">STAND</td>'
-    +'<td style="'+H+'">PREDIO/PABELL.</td>'
-    +'<td style="'+D+'">'+escHtml(r.predio||'—')+'</td>'
-    +'<td rowspan="2" style="'+H+';text-align:center">LOTE</td>'
-    +'<td rowspan="2" style="'+D+';padding:0">'
-    +'<table style="width:100%;border-collapse:collapse">'
-    +'<tr><td style="'+H+';border:none;border-bottom:1px solid #ccc">NÚMERO</td><td style="'+D+';border:none;border-bottom:1px solid #ccc">'+escHtml(r.loteNro||'—')+'</td></tr>'
-    +'<tr><td style="'+H+';border:none;border-bottom:1px solid #ccc">FRENTE</td><td style="'+D+';border:none;border-bottom:1px solid #ccc">'+escHtml(r.frente||'—')+' m</td></tr>'
-    +'<tr><td style="'+H+';border:none;border-bottom:1px solid #ccc">FONDO</td><td style="'+D+';border:none;border-bottom:1px solid #ccc">'+escHtml(r.fondo||'—')+' m</td></tr>'
-    +'<tr><td style="'+H+';border:none;border-bottom:1px solid #ccc">PISO (M²)</td><td style="'+D+';border:none;border-bottom:1px solid #ccc">'+escHtml(r.m2||'0')+'</td></tr>'
-    +'<tr><td style="'+H+';border:none;border-bottom:1px solid #ccc">ENTREPISO (M²)</td><td style="'+D+';border:none;border-bottom:1px solid #ccc">'+escHtml(r.entrepiso||'0')+'</td></tr>'
-    +'<tr><td style="'+H+';border:none;font-weight:800">TOTAL</td><td style="'+D+';border:none;font-weight:800">'+(parseFloat(r.m2||0)+parseFloat(r.entrepiso||0))+' m²</td></tr>'
+    +'<td rowspan="2" style="'+H2+'">STAND</td>'
+    +'<td style="'+H2+'">PREDIO/PABELL.</td>'
+    +'<td style="'+D2+'">'+escHtml(r.predio||'—')+'</td>'
+    +'<td rowspan="2" style="'+H2+';text-align:center">LOTE</td>'
+    +'<td rowspan="2" style="'+D2+';padding:3px">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:10px">'
+    +'<tr><td style="'+H2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">NÚMERO</td><td style="'+D2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">'+escHtml(r.loteNro||'—')+'</td></tr>'
+    +'<tr><td style="'+H2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">FRENTE</td><td style="'+D2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">'+escHtml(r.frente||'—')+' m</td></tr>'
+    +'<tr><td style="'+H2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">FONDO</td><td style="'+D2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">'+escHtml(r.fondo||'—')+' m</td></tr>'
+    +'<tr><td style="'+H2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">PISO (M²)</td><td style="'+D2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">'+escHtml(r.m2||'0')+'</td></tr>'
+    +'<tr><td style="'+H2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">ENTREPISO (M²)</td><td style="'+D2+';border:none;border-bottom:1px solid #ddd;padding:3px 6px">'+escHtml(r.entrepiso||'0')+'</td></tr>'
+    +'<tr><td style="'+H2+';border:none;padding:3px 6px;font-weight:800">TOTAL</td><td style="'+D2+';border:none;padding:3px 6px;font-weight:800">'+(parseFloat(r.m2||0)+parseFloat(r.entrepiso||0))+' m²</td></tr>'
     +'</table>'
     +'</td>'
     +'</tr>'
-    // Fila 6: Stand tipología
     +'<tr>'
-    +'<td style="'+H+'">TIPOLOGÍA</td>'
-    +'<td style="'+D+'">'+escHtml(r.tipo||'—')+'</td>'
+    +'<td style="'+H2+'">TIPOLOGÍA</td>'
+    +'<td style="'+D2+'">'+escHtml(r.tipo||'—')+'</td>'
     +'</tr>'
     +'</table>'
 
-    // Detalle de ítems
-    +'<div style="font-size:11px;font-weight:700;color:#333;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Detalle</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">'
-    +'<tr>'
-    +'<td style="'+H+';width:50%">Ítem</td>'
-    +'<td style="'+H+';text-align:center;width:15%">Cantidad</td>'
-    +'<td style="'+H+';text-align:right;width:17%">Precio unit.</td>'
-    +'<td style="'+H+';text-align:right;width:18%">Subtotal</td>'
-    +'</tr>'
-    +itemsRows
-    +'</table>'
+    // Detalle descriptivo por rubro
+    +(detalleRows?
+      '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Composición del stand</div>'
+      +'<table style="width:100%;border-collapse:collapse;margin-bottom:14px">'
+      +detalleRows
+      +'</table>'
+    :'')
 
-    // Solo precio final — sin desglose interno
-    +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">'
+    // Precio — solo totales, sin desglose
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">'
     +'<tr>'
     +'<td style="padding:9px 12px;border:2px solid #333;font-weight:700;font-size:13px;width:55%">PRECIO DE VENTA (sin IVA)</td>'
     +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:16px">'+fV(precioVenta)+'</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-size:11px;color:#666">'+sym+' '+fmt(precioVenta/m2n)+'/m²</td>'
     +'</tr>'
     +'<tr>'
     +'<td style="padding:7px 12px;border:1px solid #ddd;color:#666">IVA 21%</td>'
     +'<td style="padding:7px 12px;border:1px solid #ddd;text-align:right;color:#666">'+fV(ivaVal)+'</td>'
+    +'<td style="padding:7px 12px;border:1px solid #ddd"></td>'
     +'</tr>'
     +'<tr style="background:#f0f0f0">'
     +'<td style="padding:9px 12px;border:2px solid #333;font-weight:700;font-size:13px">PRECIO TOTAL + IVA</td>'
     +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-weight:700;font-size:15px">'+fV(precioIVA)+'</td>'
+    +'<td style="padding:9px 12px;border:2px solid #333;text-align:right;font-size:11px;color:#555">'+sym+' '+fmt(precioIVA/m2n)+'/m²</td>'
     +'</tr>'
-    +tcRow
     +'</table>'
+    +tcNote
 
     // Observaciones
-    +'<div style="font-size:11px;font-weight:700;color:#333;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Observaciones</div>'
-    +'<div style="font-size:11px;color:#555;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:46px;line-height:1.6">'+escHtml(r.brief||'')+'</div>'
+    +(r.brief?'<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Observaciones</div>'
+    +'<div style="font-size:11px;color:#555;border:1px solid #ddd;border-radius:4px;padding:9px;min-height:40px;line-height:1.6;margin-bottom:14px">'+escHtml(r.brief)+'</div>':'')
 
     // Pie
-    +'<div style="margin-top:22px;padding-top:12px;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:flex-end">'
-    +'<div style="font-size:9px;color:#999;line-height:1.7">'
-    +'<div>Precios NO incluyen IVA.</div>'
-    +'<div>Domingos y feriados: 30% de recargo.</div>'
+    +'<div style="margin-top:18px;padding-top:12px;border-top:1px solid #ddd;display:flex;justify-content:space-between;align-items:flex-end">'
+    +'<div style="font-size:9px;color:#aaa;line-height:1.7">'
+    +'<div>Precios NO incluyen IVA. Domingos y feriados: 30% de recargo.</div>'
     +'<div>Trabajos en altura mayor a 3m: 50% de recargo (excepto cielorrasos).</div>'
     +'<div>Trabajos solicitados con menos de 5 días de anticipación: 30% de recargo.</div>'
     +'</div>'
@@ -2104,6 +2110,10 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +'</div>';
   return html;
 }
+
+var H='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
+var D='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
+
 
 var H='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
 var D='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
