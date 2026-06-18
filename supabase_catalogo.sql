@@ -25,3 +25,22 @@ create policy "catalogo_all" on catalogo for all to authenticated using (true) w
 
 -- Índice por rubro para queries rápidas
 create index if not exists catalogo_rubro_idx on catalogo(rubro, orden);
+
+-- ── LIMPIEZA: borrar filas con IDs duplicados (pisos_pisos_xxx) ──
+-- Ejecutar si los precios no aparecen después del primer guardado
+DELETE FROM catalogo
+WHERE id LIKE '%\_%\_%'  -- tiene más de un underscore en el prefijo
+  AND (
+    id LIKE 'pisos_pisos_%'
+    OR id LIKE 'constructor_constructor_%'
+    OR id LIKE 'vidrios_vidrios_%'
+    OR id LIKE 'electricidad_electricidad_%'
+    OR id LIKE 'grafica_grafica_%'
+    OR id LIKE 'equipamiento_equipamiento_%'
+    OR id LIKE 'audiovisual_audiovisual_%'
+    OR id LIKE 'otros_otros_%'
+    OR id LIKE 'indirectos_indirectos_%'
+  );
+
+-- Verificar qué quedó
+SELECT rubro, count(*) as items FROM catalogo WHERE activo=true GROUP BY rubro ORDER BY rubro;
