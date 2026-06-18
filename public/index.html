@@ -900,29 +900,44 @@ function renderParamsForm(){
 // ── CATÁLOGO: lectura/escritura por rubro en tabla dedicada ──
 
 async function loadCatalog(){
+  // Inicializar con defaults (fallback si Supabase falla)
   preciosCatalog={};
-  // Inicializar con defaults primero
   Object.keys(DEFAULT_CATALOG).forEach(k=>{
     preciosCatalog[k]=JSON.parse(JSON.stringify(DEFAULT_CATALOG[k]));
   });
+
   try{
-    const{data,error}=await sb.from('catalogo').select('*').eq('activo',true).order('orden');
+    const{data,error}=await sb.from('catalogo')
+      .select('id,rubro,label,unit,precio,orden')
+      .eq('activo',true)
+      .order('rubro').order('orden');
+
+    if(error) throw error;
+
     if(data&&data.length>0){
-      // Agrupar por rubro — reemplaza el default de cada rubro que tenga datos
+      // Agrupar por rubro — cada rubro con datos en Supabase REEMPLAZA el default
       const byRubro={};
       data.forEach(row=>{
         if(!byRubro[row.rubro])byRubro[row.rubro]=[];
-        byRubro[row.rubro].push({id:row.id,label:row.label,unit:row.unit,precio:parseFloat(row.precio)||0});
+        byRubro[row.rubro].push({
+          id:row.id,
+          label:row.label,
+          unit:row.unit||'u',
+          precio:parseFloat(row.precio)||0
+        });
       });
-      // Solo reemplazar los rubros que tienen datos en Supabase
       Object.keys(byRubro).forEach(rubro=>{
-        if(byRubro[rubro].length>0) preciosCatalog[rubro]=byRubro[rubro];
+        preciosCatalog[rubro]=byRubro[rubro];
       });
     }
   }catch(e){
-    console.warn('Tabla catalogo no existe aún, usando defaults',e.message);
+    console.warn('Error cargando catálogo de Supabase, usando defaults:',e.message);
   }
-  Object.keys(DEFAULT_CATALOG).forEach(k=>{if(!preciosCatalog[k])preciosCatalog[k]=[];});
+
+  // Asegurar que todas las secciones existan (aunque sea vacías)
+  Object.keys(DEFAULT_CATALOG).forEach(k=>{
+    if(!preciosCatalog[k])preciosCatalog[k]=[];
+  });
 }
 
 async function savePrecios(){
@@ -939,42 +954,57 @@ async function savePrecios(){
   }
 }
 
+// Genera ID estable a partir del label: 'Vidrio 3+3' → 'vidrios_vidrio_3_3'
+function makeItemId(rubro, label){
+  const slug=label.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'') // quitar tildes
+    .replace(/[^a-z0-9]+/g,'_')
+    .replace(/^_|_$/g,'')
+    .slice(0,40);
+  return rubro+'_'+slug;
+}
+
 async function saveRubro(rubro){
   const items=preciosCatalog[rubro]||[];
 
-  // Generar ID estable: rubro_idx0, rubro_idx1...
-  // NUNCA soft-delete — solo upsert. Lo que el usuario eliminó
-  // ya no está en el array, así que simplemente no se upserta.
-  // Para eliminar físicamente, el usuario usa el botón × en la UI.
-  const rows=items.map((it,i)=>({
-    id: rubro+'_idx'+i,
-    rubro,
-    label: it.label||'',
-    unit:  it.unit||'u',
-    precio: parseFloat(it.precio)||0,
-    activo: true,
-    orden:  i,
-    updated_by: currentUser.id,
-    updated_at: new Date().toISOString()
-  }));
+  const rows=items.map((it,i)=>{
+    // Si el ítem ya tiene un ID fijo de Supabase (no es 'new_xxx'), lo conservamos
+    // Si es nuevo o tiene ID temporal, generamos uno desde el label
+    const stableId=(it.id&&!String(it.id).startsWith('new')&&!String(it.id).match(/_idx\d+$/))
+      ? it.id
+      : makeItemId(rubro, it.label||('item'+i));
+    return {
+      id: stableId,
+      rubro,
+      label: it.label||'',
+      unit:  it.unit||'u',
+      precio: parseFloat(it.precio)||0,
+      activo: true,
+      orden:  i,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString()
+    };
+  });
 
   if(rows.length>0){
     const{error}=await sb.from('catalogo').upsert(rows,{onConflict:'id'});
     if(error)throw new Error(error.message);
   }
 
-  // Marcar como inactivos SOLO los ítems que el usuario explícitamente quitó
-  // (los que tienen índice mayor al máximo actual)
-  if(rows.length>0){
-    // Desactivar ítems con orden >= cantidad actual (sobran del pasado)
+  // Eliminar físicamente de Supabase los ítems que el usuario quitó con ×
+  // (los que estaban en Supabase pero ya no están en el array actual)
+  const activeIds=rows.map(r=>r.id);
+  if(activeIds.length>0){
     await sb.from('catalogo')
-      .update({activo:false,updated_at:new Date().toISOString()})
+      .delete()
       .eq('rubro',rubro)
-      .gte('orden',rows.length)
-      .like('id',rubro+'_idx%');
+      .not('id','in','('+activeIds.map(id=>"'"+id+"'").join(',')+')');
+  } else {
+    // Si el rubro quedó vacío, eliminar todo
+    await sb.from('catalogo').delete().eq('rubro',rubro);
   }
 
-  // Sincronizar IDs en memoria
+  // Sincronizar IDs estables en memoria
   preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
 }
 
@@ -1151,15 +1181,26 @@ function renderPreciosTab(tab){
 function updateCatalogItem(tab,i,field,val){
   if(preciosCatalog[tab]&&preciosCatalog[tab][i]) preciosCatalog[tab][i][field]=val;
 }
-function deleteCatalogItem(tab,i){preciosCatalog[tab].splice(i,1);renderPreciosTab(tab);}
+async function deleteCatalogItem(tab,i){
+  const item=preciosCatalog[tab][i];
+  // Eliminar de Supabase si tiene ID fijo
+  if(item&&item.id&&!String(item.id).startsWith('new')){
+    try{
+      await sb.from('catalogo').delete().eq('id',item.id);
+    }catch(e){console.warn('No se pudo eliminar de Supabase:',e.message);}
+  }
+  preciosCatalog[tab].splice(i,1);
+  renderPreciosTab(tab);
+  markPreciosDirty();
+}
 function addCatalogItem(tab){
   if(!preciosCatalog[tab])preciosCatalog[tab]=[];
-  preciosCatalog[tab].push({id:'new_'+Date.now(),label:'Nuevo ítem',unit:'u',precio:0});
+  preciosCatalog[tab].push({id:'new_'+Date.now(),label:'',unit:'u',precio:0});
   renderPreciosTab(tab);
-  // Foco en el último label agregado
+  markPreciosDirty();
   setTimeout(()=>{
     const rows=document.querySelectorAll('#precios-content .precio-item');
-    if(rows.length){const inp=rows[rows.length-1].querySelector('input');if(inp)inp.focus();}
+    if(rows.length){const inp=rows[rows.length-1].querySelector('input');if(inp){inp.focus();inp.select();}}
   },50);
 }
 async function applyInflacion(){
