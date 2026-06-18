@@ -1445,28 +1445,22 @@ function buildPipItemRow(r){
     };
 
     RECARGOS.forEach(rec=>{
-      const lbl=document.createElement('label');
-      lbl.style.cssText='display:flex;align-items:center;gap:3px;font-size:10px;color:#555;cursor:pointer;background:#F7F3EE;border:1px solid #DDD4C8;border-radius:4px;padding:2px 7px;user-select:none';
-      const chk=document.createElement('input');
-      chk.type='checkbox';
-      chk.checked=r.recargos[rec.key]||false;
-      chk.style.cssText='accent-color:var(--accent);width:12px;height:12px;cursor:pointer';
-      chk.addEventListener('change',()=>{
-        r.recargos[rec.key]=chk.checked;
-        lbl.style.background=chk.checked?'#FFF0E8':' #F7F3EE';
-        lbl.style.borderColor=chk.checked?'var(--accent)':' #DDD4C8';
-        lbl.style.color=chk.checked?'var(--accent)':' #555';
+      const active=r.recargos[rec.key]||false;
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.textContent=(active?'✓ ':'')+rec.label;
+      btn.dataset.active=active?'1':'';
+      const styleOff='font-size:10px;font-weight:600;cursor:pointer;border-radius:20px;padding:3px 11px;border:1.5px solid #DDD4C8;background:#F0EAE2;color:#999;transition:all .15s;outline:none';
+      const styleOn='font-size:10px;font-weight:700;cursor:pointer;border-radius:20px;padding:3px 11px;border:1.5px solid var(--green);background:var(--green);color:#fff;transition:all .15s;outline:none';
+      btn.style.cssText=active?styleOn:styleOff;
+      btn.addEventListener('click',()=>{
+        r.recargos[rec.key]=!r.recargos[rec.key];
+        const isOn=r.recargos[rec.key];
+        btn.style.cssText=isOn?styleOn:styleOff;
+        btn.textContent=(isOn?'✓ ':'')+rec.label;
         recalcPrecio();
       });
-      // Estilo inicial si ya estaba marcado
-      if(r.recargos[rec.key]){
-        lbl.style.background='#FFF0E8';
-        lbl.style.borderColor='var(--accent)';
-        lbl.style.color='var(--accent)';
-      }
-      lbl.appendChild(chk);
-      lbl.appendChild(document.createTextNode(' '+rec.label));
-      recargoWrap.appendChild(lbl);
+      recargoWrap.appendChild(btn);
     });
     info.appendChild(recargoWrap);
 
