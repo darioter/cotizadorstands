@@ -1877,12 +1877,26 @@ Respondé SOLO JSON sin markdown:
 
     const resultado={...res,propuestas:diseño.propuestas||[]};
 
-    // Guardar en Supabase
+    // Guardar o actualizar en Supabase
     try{
-      await sb.from('proyectos').insert({
-        nombre:res.nombre,cliente:res.cliente,brief_texto:res.brief,
-        superficie_m2:res.m2||null,resultado,created_by:currentUser.id
-      });
+      if(_editingProyectoId){
+        await sb.from('proyectos').update({
+          nombre:res.nombre,cliente:res.cliente,brief_texto:res.brief,
+          superficie_m2:res.m2||null,resultado,updated_at:new Date().toISOString()
+        }).eq('id',_editingProyectoId);
+        // Actualizar en cache local
+        const idx=_proyectosData.findIndex(x=>x.id===_editingProyectoId);
+        if(idx>=0)_proyectosData[idx]={..._proyectosData[idx],nombre:res.nombre,cliente:res.cliente,superficie_m2:res.m2||null,resultado};
+        toast('✓ Proyecto actualizado','success');
+        _editingProyectoId=null;
+        const banner=document.getElementById('edit-banner');
+        if(banner)banner.remove();
+      } else {
+        await sb.from('proyectos').insert({
+          nombre:res.nombre,cliente:res.cliente,brief_texto:res.brief,
+          superficie_m2:res.m2||null,resultado,created_by:currentUser.id
+        });
+      }
     }catch(e){console.warn('No se pudo guardar:',e.message);}
 
     clearInterval(si_int);
@@ -2240,6 +2254,9 @@ function resetPIP(){
   document.getElementById('step-resultado').style.display='none';
   if(document.getElementById('calc-preview'))document.getElementById('calc-preview').innerHTML='';
   _calcSnapshot=null;
+  _editingProyectoId=null;
+  const banner=document.getElementById('edit-banner');
+  if(banner)banner.remove();
   uploadedFiles={brief:null,planta:null,render:null};
   ['brief','planta','render'].forEach(t=>{
     const dz=document.getElementById('dz-'+t);
@@ -2253,6 +2270,7 @@ function resetPIP(){
 // ── PROYECTOS ──
 // ── PROYECTOS ──
 let _proyectosData=[];
+let _editingProyectoId=null; // ID del proyecto que se está editando
 
 async function loadProyectos(){
   const el=document.getElementById('proyectos-list');
@@ -2374,31 +2392,91 @@ async function openProyecto(id){
 
 function editProyecto(id){
   const p=_proyectosData.find(x=>x.id===id);
-  if(!p)return;
-  showModal(`
-    <h3 style="font-family:'Georgia',serif;color:var(--navy);margin-bottom:14px">Editar proyecto</h3>
-    <div class="mb-10"><label class="field-label">Nombre</label><input id="edit-nombre" value="${escHtml(p.nombre)}" style="width:100%" /></div>
-    <div class="mb-10"><label class="field-label">Cliente</label><input id="edit-cliente" value="${escHtml(p.cliente||'')}" style="width:100%" /></div>
-    <div class="mb-10"><label class="field-label">M²</label><input type="number" id="edit-m2" value="${p.superficie_m2||''}" style="width:100%" /></div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-primary" style="flex:1" onclick="guardarEditProyecto('${id}')">Guardar</button>
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-    </div>
-  `);
+  if(!p||!p.resultado)return toast('Sin datos para editar','error');
+  const res=p.resultado;
+  _editingProyectoId=id;
+  showView('pip');
+  resetPIP();
+
+  const setVal=(elId,val)=>{const el=document.getElementById(elId);if(el&&val!=null)el.value=val;};
+  setVal('pip-nro',res.nro||'');
+  setVal('pip-nombre',res.nombre||p.nombre||'');
+  setVal('pip-cliente',res.cliente||p.cliente||'');
+  setVal('pip-pauta',res.pauta||'');
+  setVal('pip-evento',res.evento||'');
+  setVal('pip-lugar',res.lugar||'');
+  setVal('pip-predio',res.predio||'');
+  setVal('pip-lote-nro',res.loteNro||'');
+  setVal('pip-m2',res.m2||p.superficie_m2||'');
+  setVal('pip-frente',res.frente||'');
+  setVal('pip-fondo',res.fondo||'');
+  setVal('pip-entrepiso',res.entrepiso||'');
+  setVal('pip-brief',res.brief||p.brief_texto||'');
+
+  // Tipología
+  if(res.tipo){const s=document.getElementById('pip-tipo');if(s)Array.from(s.options).forEach(o=>{if(o.text===res.tipo)s.value=o.value;});}
+  // Modalidad
+  if(res.modalidad){const s=document.getElementById('pip-modalidad');if(s)s.value=res.modalidad;}
+
+  // Fechas dd/mm/yy → yyyy-mm-dd
+  const parseFecha=str=>{
+    if(!str||str==='—')return '';
+    const p=str.split('/');
+    if(p.length===3){const yr=p[2].length===2?'20'+p[2]:p[2];return yr+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
+    return '';
+  };
+  setVal('pip-fecha-apertura',parseFecha(res.fechaApertura));
+  setVal('pip-fecha-cierre',parseFecha(res.fechaCierre));
+  setVal('pip-fecha-montaje',parseFecha(res.fechaMontaje));
+  setVal('pip-fecha-desmontaje',parseFecha(res.fechaDesmontaje));
+
+  // Moneda
+  if(res.moneda){
+    const ms=document.getElementById('pip-moneda');
+    if(ms){ms.value=res.moneda.moneda||'ARS';onMonedaChange();}
+    if(res.moneda.cotizacion)setVal('pip-cotizacion',res.moneda.cotizacion);
+    if(res.moneda.mgCambio)setVal('pip-mg-cambio',(res.moneda.mgCambio*100).toFixed(1));
+    calcTC();
+  }
+
+  // Restaurar CV-A
+  pipRubrosA=[];
+  (res.rubrosA||[]).forEach(it=>{
+    pipRubrosA.push({section:it.section||'otros',sectionLabel:it.sectionLabel||'📦 Otros',
+      id:it.id,label:it.label,unit:it.unit||'u',
+      precio:it.precioBase||it.precio||0,precioBase:it.precioBase||it.precio||0,
+      cant:it.cant||0,notas:it.notas||'',isNew:false,recargos:it.recargos||null});
+  });
+  // Restaurar CV-B
+  pipRubrosB=[];
+  (res.rubrosB||[]).forEach(it=>{
+    pipRubrosB.push({id:it.id,label:it.label,precio:it.precio||0,cant:it.cant||1});
+  });
+  renderPIPRubrosA();
+  renderPIPRubrosB();
+
+  // Banner de modo edición
+  const banner=document.createElement('div');
+  banner.id='edit-banner';
+  banner.style.cssText='background:#1B2A3B;color:#fff;border-radius:9px;padding:10px 14px;margin-bottom:12px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px';
+  banner.innerHTML='<span>✏ Editando: <strong>'+escHtml(p.nombre)+'</strong> — modificá y recalculá para guardar los cambios</span>'
+    +'<button onclick="cancelarEdicion()" style="background:rgba(255,255,255,.15);border:none;border-radius:5px;color:#fff;font-size:11px;padding:4px 10px;cursor:pointer">✕ Cancelar</button>';
+  const pipForm=document.getElementById('pip-form');
+  if(pipForm&&!document.getElementById('edit-banner'))pipForm.insertBefore(banner,pipForm.firstChild);
+}
+
+function cancelarEdicion(){
+  _editingProyectoId=null;
+  const banner=document.getElementById('edit-banner');
+  if(banner)banner.remove();
+  resetPIP();
+  showView('proyectos');
 }
 
 async function guardarEditProyecto(id){
-  const nombre=document.getElementById('edit-nombre').value.trim();
-  const cliente=document.getElementById('edit-cliente').value.trim();
-  const m2=document.getElementById('edit-m2').value;
-  if(!nombre)return toast('El nombre es obligatorio','error');
-  await sb.from('proyectos').update({nombre,cliente,superficie_m2:m2||null,updated_at:new Date().toISOString()}).eq('id',id);
-  const p=_proyectosData.find(x=>x.id===id);
-  if(p){p.nombre=nombre;p.cliente=cliente;p.superficie_m2=m2||null;}
-  closeModal();
-  renderProyectosList();
-  toast('✓ Proyecto actualizado','success');
+  toast('Usá el formulario PIP para editar el proyecto completo','error');
 }
+
 
 async function duplicarProyecto(id){
   const p=_proyectosData.find(x=>x.id===id);
