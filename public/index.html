@@ -483,16 +483,16 @@ small{font-size:10px;color:#999}
           </div>
         </div>
         <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);-ms-overflow-style:none;scrollbar-width:none">
-          <button class="tab active" onclick="preciosTab('pisos',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Pisos</button>
-          <button class="tab" onclick="preciosTab('constructor',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Constructor</button>
-          <button class="tab" onclick="preciosTab('vidrios',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Vidrios</button>
-          <button class="tab" onclick="preciosTab('electricidad',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Elect.</button>
-          <button class="tab" onclick="preciosTab('grafica',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Gráfica</button>
-          <button class="tab" onclick="preciosTab('equipamiento',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Mobil.</button>
-          <button class="tab" onclick="preciosTab('audiovisual',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">AV</button>
-          <button class="tab" onclick="preciosTab('entelados',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">🧵 Entelados</button>
-          <button class="tab" onclick="preciosTab('otros',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">Otros</button>
-          <button class="tab" onclick="preciosTab('indirectos',this)" style="flex:none;border-radius:0;padding:9px 12px;font-size:11px">CV-B</button>
+          <button class="tab active" onclick="preciosTab('pisos',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#8B6F47">🪵 Pisos</button>
+          <button class="tab" onclick="preciosTab('constructor',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#4A6741">🏗 Constructor</button>
+          <button class="tab" onclick="preciosTab('vidrios',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#2C7BB6">🪟 Vidrios</button>
+          <button class="tab" onclick="preciosTab('electricidad',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#D4A017">💡 Elect.</button>
+          <button class="tab" onclick="preciosTab('grafica',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#B85C38">🖨 Gráfica</button>
+          <button class="tab" onclick="preciosTab('equipamiento',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#5B4A8A">🪑 Mobil.</button>
+          <button class="tab" onclick="preciosTab('audiovisual',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#1A7A8A">📺 AV</button>
+          <button class="tab" onclick="preciosTab('entelados',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#3A8A5C">🧵 Entelados</button>
+          <button class="tab" onclick="preciosTab('otros',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#6A6A6A">📦 Otros</button>
+          <button class="tab" onclick="preciosTab('indirectos',this)" style="flex:none;border-radius:0;padding:8px 12px;font-size:11px" data-color="#8A3A3A">📋 CV-B</button>
         </div>
         <div id="precios-content"></div>
         <div style="padding:8px 14px;border-top:1px solid var(--border)">
@@ -937,6 +937,16 @@ async function showView(v){
     const inflPanel=document.querySelector('#view-precios .flex.gap-6 div[style*="FFFBF0"]');
     if(inflPanel) inflPanel.style.display=isAdmin()?'flex':'none';
     renderPreciosTab(currentPreciosTab);
+    // Color del tab activo al cargar
+    setTimeout(()=>{
+      const activeTab=document.querySelector('#view-precios .tab.active');
+      if(activeTab){
+        const color=activeTab.dataset.color||'var(--accent)';
+        activeTab.style.color=color;
+        activeTab.style.borderBottom='2.5px solid '+color;
+        activeTab.style.fontWeight='700';
+      }
+    },0);
     // Deshabilitar inputs de precios para members
     if(!isAdmin()){
       setTimeout(()=>{
@@ -1157,8 +1167,17 @@ function markPreciosDirty(){
 }
 function preciosTab(tab,btn){
   currentPreciosTab=tab;
-  document.querySelectorAll('#view-precios .tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#view-precios .tab').forEach(b=>{
+    b.classList.remove('active');
+    b.style.color='';
+    b.style.borderBottom='';
+    b.style.fontWeight='';
+  });
   btn.classList.add('active');
+  const color=btn.dataset.color||'var(--accent)';
+  btn.style.color=color;
+  btn.style.borderBottom='2.5px solid '+color;
+  btn.style.fontWeight='700';
   renderPreciosTab(tab);
 }
 // ── CATÁLOGO: funciones de edición directa sin rerenderizar ──
