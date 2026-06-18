@@ -919,7 +919,8 @@ async function loadCatalog(){
     if(resp.data&&resp.data.length>0){
       const byRubro={};
       resp.data.forEach(row=>{
-        if(!byRubro[row.rubro])byRubro[row.rubro]=[];
+        if(!row.rubro) return; // saltar filas sin rubro
+        if(!Array.isArray(byRubro[row.rubro]))byRubro[row.rubro]=[];
         byRubro[row.rubro].push({
           id:row.id,
           label:row.label,
