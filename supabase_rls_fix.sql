@@ -27,3 +27,10 @@ create policy "catalogo_delete" on catalogo
 select schemaname, tablename, policyname, cmd 
 from pg_policies 
 where tablename = 'catalogo';
+
+-- ── ASIGNAR ROL ADMIN ──
+-- Reemplazá el email con el tuyo
+UPDATE profiles SET role = 'admin' WHERE email = 'TU_EMAIL@aqui.com';
+
+-- Verificar roles actuales
+SELECT email, role FROM profiles ORDER BY created_at;

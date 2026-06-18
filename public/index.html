@@ -442,8 +442,11 @@ small{font-size:10px;color:#999}
               <input type="text" id="inflacion-motivo" placeholder="motivo" style="width:70px;padding:3px 5px;font-size:10px;border-radius:4px;border:1px solid #DDD4C8;background:#fff" />
               <button class="btn btn-gold btn-sm" onclick="applyInflacion()">↑</button>
             </div>
-            <button class="btn btn-sm" style="background:#F0EAE2;color:#666;font-size:11px" onclick="resetRubroDefault()" title="Resetear SOLO este rubro al listado por defecto">↺ Default rubro</button>
-            <button class="btn btn-primary btn-sm" onclick="savePrecios()" id="btn-save-precios">Guardar rubro</button>
+            <span id="admin-precios-btns" style="display:none;gap:6px" class="flex">
+              <button class="btn btn-sm" style="background:#F0EAE2;color:#666;font-size:11px" onclick="resetRubroDefault()" title="Resetear SOLO este rubro al listado por defecto">↺ Default rubro</button>
+              <button class="btn btn-primary btn-sm" onclick="savePrecios()" id="btn-save-precios">Guardar rubro</button>
+            </span>
+            <span id="member-precios-label" style="display:none;font-size:11px;color:#888">Solo lectura</span>
           </div>
         </div>
         <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);-ms-overflow-style:none;scrollbar-width:none">
@@ -879,6 +882,8 @@ function showAuthError(msg){const el=document.getElementById('auth-error');el.te
 
 // ── VIEWS ──
 const VIEWS=['pip','proyectos','precios','parametros','equipo'];
+function isAdmin(){return currentProfile?.role==='admin';}
+
 async function showView(v){
   VIEWS.forEach(id=>{
     document.getElementById('view-'+id).style.display=id===v?'':'none';
@@ -886,7 +891,39 @@ async function showView(v){
     const bnav=document.getElementById('bnav-'+id);if(bnav)bnav.classList.toggle('active',id===v);
   });
   if(v==='proyectos') await loadProyectos();
-  if(v==='precios'){renderPreciosTab(currentPreciosTab);await loadHistorial();}
+  if(v==='precios'){
+    // Mostrar/ocultar controles según rol
+    const adminBtns=document.getElementById('admin-precios-btns');
+    const memberLabel=document.getElementById('member-precios-label');
+    if(adminBtns) adminBtns.style.display=isAdmin()?'flex':'none';
+    if(memberLabel) memberLabel.style.display=isAdmin()?'none':'inline';
+    // Controles de inflación solo para admin
+    const inflPanel=document.querySelector('#view-precios .flex.gap-6 div[style*="FFFBF0"]');
+    if(inflPanel) inflPanel.style.display=isAdmin()?'flex':'none';
+    renderPreciosTab(currentPreciosTab);
+    // Deshabilitar inputs de precios para members
+    if(!isAdmin()){
+      setTimeout(()=>{
+        document.querySelectorAll('#precios-content input').forEach(el=>{
+          el.disabled=true;
+          el.style.opacity='.6';
+          el.style.cursor='not-allowed';
+        });
+        document.querySelectorAll('#precios-content select').forEach(el=>{
+          el.disabled=true;
+          el.style.opacity='.6';
+        });
+        document.querySelectorAll('#precios-content button').forEach(el=>{
+          el.disabled=true;
+          el.style.opacity='.4';
+        });
+        // También ocultar el botón + ítem
+        const addBtn=document.querySelector('#view-precios .card-body .btn-secondary');
+        if(addBtn)addBtn.style.display='none';
+      },50);
+    }
+    await loadHistorial();
+  }
   if(v==='parametros') renderParamsForm();
   if(v==='equipo') await loadEquipo();
 }
@@ -900,6 +937,7 @@ async function loadParametros(){
   updateParamsSummary();
 }
 async function saveParametros(){
+  if(!isAdmin()) return toast('Solo los administradores pueden modificar parámetros','error');
   document.querySelectorAll('[data-param]').forEach(f=>{parametros[f.dataset.param]=parseFloat(f.value)/100||0;});
   try{
     await sb.from('config').upsert({key:'parametros',value:JSON.stringify(parametros),updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'key'});
@@ -980,6 +1018,7 @@ async function loadCatalog(){
 }
 
 async function savePrecios(){
+  if(!isAdmin()) return toast('Solo los administradores pueden modificar precios','error');
   const btn=document.getElementById('btn-save-precios');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
   const rubro=currentPreciosTab;
@@ -1015,7 +1054,7 @@ async function savePrecios(){
 
 
 async function resetRubroDefault(){
-  // Solo AGREGA los ítems del default que no existen todavía — no borra nada
+  if(!isAdmin()) return toast('Solo los administradores pueden usar esta función','error');
   const rubro=currentPreciosTab;
   const rubroLabels={pisos:'Pisos',constructor:'Constructor',vidrios:'Vidrios',
     electricidad:'Electricidad',grafica:'Gráfica',equipamiento:'Mobiliario',
