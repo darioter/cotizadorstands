@@ -1413,6 +1413,76 @@ function buildPipItemRow(r){
     info.appendChild(lbl);info.appendChild(sub);
   }
 
+  // Recargos para ítems de entelados
+  if(r.section==='entelados'){
+    // Inicializar recargos si no existen
+    if(!r.recargos) r.recargos={altura:false,feriado:false,urgencia:false};
+
+    const RECARGOS=[
+      {key:'altura', label:'+3m altura', pct:0.50},
+      {key:'feriado', label:'Feriado', pct:0.30},
+      {key:'urgencia', label:'Urgencia', pct:0.30},
+    ];
+
+    const recargoWrap=document.createElement('div');
+    recargoWrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;align-items:center';
+
+    const recalcPrecio=()=>{
+      // Precio base del catálogo
+      const base=r.precioBase||r.precio;
+      r.precioBase=base; // guardar base original
+      // Acumular recargos
+      let factor=1;
+      RECARGOS.forEach(rec=>{if(r.recargos[rec.key])factor+=rec.pct;});
+      r.precio=Math.round(base*factor);
+      // Actualizar subtotal
+      const subtot=r.cant*r.precio;
+      subtotDiv.textContent=r.cant>0?'= $ '+fmt(subtot):'';
+      // Mostrar precio ajustado
+      subLabel.textContent=r.unit+' · $ '+fmt(r.precio)+' c/u'+(factor>1?' (recargo '+Math.round((factor-1)*100)+'%)':'')+' [base: $ '+fmt(base)+']';
+      updateCVTotals();
+      updateSectionTotals();
+    };
+
+    RECARGOS.forEach(rec=>{
+      const lbl=document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:center;gap:3px;font-size:10px;color:#555;cursor:pointer;background:#F7F3EE;border:1px solid #DDD4C8;border-radius:4px;padding:2px 7px;user-select:none';
+      const chk=document.createElement('input');
+      chk.type='checkbox';
+      chk.checked=r.recargos[rec.key]||false;
+      chk.style.cssText='accent-color:var(--accent);width:12px;height:12px;cursor:pointer';
+      chk.addEventListener('change',()=>{
+        r.recargos[rec.key]=chk.checked;
+        lbl.style.background=chk.checked?'#FFF0E8':' #F7F3EE';
+        lbl.style.borderColor=chk.checked?'var(--accent)':' #DDD4C8';
+        lbl.style.color=chk.checked?'var(--accent)':' #555';
+        recalcPrecio();
+      });
+      // Estilo inicial si ya estaba marcado
+      if(r.recargos[rec.key]){
+        lbl.style.background='#FFF0E8';
+        lbl.style.borderColor='var(--accent)';
+        lbl.style.color='var(--accent)';
+      }
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(' '+rec.label));
+      recargoWrap.appendChild(lbl);
+    });
+    info.appendChild(recargoWrap);
+
+    // Label dinámico del precio (se actualiza con recargos)
+    var subLabel=info.querySelector('.pip-item-sub')||document.createElement('div');
+    if(!subLabel.classList.contains('pip-item-sub')){
+      subLabel.className='pip-item-sub';
+      subLabel.style.cssText='font-size:10px;color:#999;margin-top:2px';
+      info.appendChild(subLabel);
+    }
+    subLabel.textContent=r.unit+' · $ '+fmt(r.precio)+' c/u';
+    // Recalcular al montar si ya tiene recargos activos
+    const anyActive=RECARGOS.some(rec=>r.recargos[rec.key]);
+    if(anyActive) setTimeout(recalcPrecio,0);
+  }
+
   // Subtotal dinámico
   const subtotDiv=document.createElement('div');
   subtotDiv.style.cssText='font-size:11px;font-weight:700;color:var(--accent);margin-top:3px;min-height:16px';
