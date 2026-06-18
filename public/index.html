@@ -839,6 +839,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
 async function initApp(user){
   currentUser=user;
   const{data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
+  currentProfile=profile; // ← asignar globalmente
   const initials=(profile?.full_name||user.email||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('user-avatar').textContent=initials;
   document.getElementById('user-name-display').textContent=profile?.full_name||user.email;
