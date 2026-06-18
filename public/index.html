@@ -1045,31 +1045,6 @@ function markPreciosDirty(){
     btn.textContent='Guardar rubro ●';
   }
 }
-async function savePrecios(){
-  const btn=document.getElementById('btn-save-precios');
-  if(btn){btn.disabled=true;btn.textContent='Guardando...';}
-  try{
-    await sb.from('config').upsert(
-      {key:'catalogo',value:JSON.stringify(preciosCatalog),updated_by:currentUser.id,updated_at:new Date().toISOString()},
-      {onConflict:'key'}
-    );
-    toast('✓ Precios guardados','success');
-    if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
-    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar';btn.disabled=false;}},2000);
-  }catch(e){
-    toast('Error: '+e.message,'error');
-    if(btn){btn.disabled=false;btn.textContent='Guardar';}
-  }
-}
-
-// Marcar cambios pendientes en precios
-function markPreciosDirty(){
-  const btn=document.getElementById('btn-save-precios');
-  if(btn&&btn.textContent!=='Guardando...'&&btn.textContent!=='✓ Guardado'){
-    btn.style.background='var(--accent)';
-    btn.textContent='Guardar cambios ●';
-  }
-}
 function preciosTab(tab,btn){
   currentPreciosTab=tab;
   document.querySelectorAll('#view-precios .tab').forEach(b=>b.classList.remove('active'));
