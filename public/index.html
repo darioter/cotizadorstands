@@ -944,67 +944,40 @@ async function savePrecios(){
   const btn=document.getElementById('btn-save-precios');
   if(btn){btn.disabled=true;btn.textContent='Guardando...';}
   try{
-    await saveRubro(currentPreciosTab);
-    toast('✓ Rubro guardado','success');
-    if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
-    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar';btn.disabled=false;}},2000);
-  }catch(e){
-    toast('Error: '+e.message,'error');
-    if(btn){btn.disabled=false;btn.textContent='Guardar';}
-  }
-}
+    const rubro=currentPreciosTab;
+    const items=preciosCatalog[rubro]||[];
 
-// Genera ID estable a partir del label: 'Vidrio 3+3' → 'vidrios_vidrio_3_3'
-function makeItemId(rubro, label){
-  const slug=label.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,'') // quitar tildes
-    .replace(/[^a-z0-9]+/g,'_')
-    .replace(/^_|_$/g,'')
-    .slice(0,40);
-  return rubro+'_'+slug;
-}
+    // DELETE todo el rubro + INSERT limpio — sin conflictos de IDs ni UPDATE
+    const{error:delErr}=await sb.from('catalogo').delete().eq('rubro',rubro);
+    if(delErr)throw new Error('Error al borrar: '+delErr.message);
 
-async function saveRubro(rubro){
-  const items=preciosCatalog[rubro]||[];
-
-  // Generar filas con IDs estables
-  const rows=items.map((it,i)=>{
-    const stableId=(it.id && !String(it.id).startsWith('new') && !String(it.id).includes('_idx'))
-      ? it.id
-      : makeItemId(rubro, it.label||('item'+i));
-    return {
-      id: stableId,
-      rubro,
-      label: it.label||'',
-      unit:  it.unit||'u',
-      precio: parseFloat(it.precio)||0,
-      activo: true,
-      orden:  i,
-      updated_by: currentUser.id,
-      updated_at: new Date().toISOString()
-    };
-  });
-
-  // 1. Upsert los ítems actuales
-  if(rows.length>0){
-    const{error}=await sb.from('catalogo').upsert(rows,{onConflict:'id'});
-    if(error) throw new Error('Upsert error: '+error.message);
-  }
-
-  // 2. Eliminar los que ya no están: traer IDs actuales en Supabase para este rubro
-  //    y borrar los que no están en el array nuevo
-  const{data:existentes}=await sb.from('catalogo').select('id').eq('rubro',rubro);
-  if(existentes&&existentes.length>0){
-    const activeIds=new Set(rows.map(r=>r.id));
-    const toDelete=existentes.filter(e=>!activeIds.has(e.id)).map(e=>e.id);
-    for(const delId of toDelete){
-      await sb.from('catalogo').delete().eq('id',delId);
+    if(items.length>0){
+      const rows=items.map((it,i)=>({
+        id: rubro+'_'+String(i).padStart(3,'0'),
+        rubro,
+        label: it.label||'',
+        unit:  it.unit||'u',
+        precio: parseFloat(it.precio)||0,
+        activo: true,
+        orden:  i,
+        updated_by: currentUser.id,
+        updated_at: new Date().toISOString()
+      }));
+      const{error:insErr}=await sb.from('catalogo').insert(rows);
+      if(insErr)throw new Error('Error al insertar: '+insErr.message);
+      preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
     }
-  }
 
-  // 3. Sincronizar IDs en memoria
-  preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
+    toast('✓ Guardado en Supabase','success');
+    if(btn){btn.style.background='var(--green)';btn.textContent='✓ Guardado';}
+    setTimeout(()=>{if(btn){btn.style.background='';btn.textContent='Guardar rubro';btn.disabled=false;}},2500);
+  }catch(e){
+    console.error('savePrecios:',e);
+    toast('Error: '+e.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='Guardar rubro';}
+  }
 }
+
 
 async function resetRubroDefault(){
   // Solo AGREGA los ítems del default que no existen todavía — no borra nada
