@@ -942,51 +942,65 @@ async function savePrecios(){
 async function saveRubro(rubro){
   const items=preciosCatalog[rubro]||[];
 
-  // Generar ID limpio: siempre rubro_índice, sin duplicar prefijo
-  const rows=items.map((it,i)=>{
-    // El id puede venir como 'pisos_p1', 'p1', o 'new_xxx'
-    // Normalizamos: siempre guardamos como rubro+'_idx'
-    const cleanId=rubro+'_idx'+i;
-    return {
-      id:cleanId,
-      rubro,
-      label:it.label||'',
-      unit:it.unit||'u',
-      precio:parseFloat(it.precio)||0,
-      activo:true,
-      orden:i,
-      updated_by:currentUser.id,
-      updated_at:new Date().toISOString()
-    };
-  });
+  // Generar ID estable: rubro_idx0, rubro_idx1...
+  // NUNCA soft-delete — solo upsert. Lo que el usuario eliminó
+  // ya no está en el array, así que simplemente no se upserta.
+  // Para eliminar físicamente, el usuario usa el botón × en la UI.
+  const rows=items.map((it,i)=>({
+    id: rubro+'_idx'+i,
+    rubro,
+    label: it.label||'',
+    unit:  it.unit||'u',
+    precio: parseFloat(it.precio)||0,
+    activo: true,
+    orden:  i,
+    updated_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  }));
 
   if(rows.length>0){
     const{error}=await sb.from('catalogo').upsert(rows,{onConflict:'id'});
     if(error)throw new Error(error.message);
   }
 
-  // Soft-delete ítems que ya no existen (IDs fuera del rango actual)
-  // Marcamos como inactivos todos los del rubro que no están en los IDs actuales
-  const activeIds=rows.map(r=>r.id);
-  if(activeIds.length>0){
+  // Marcar como inactivos SOLO los ítems que el usuario explícitamente quitó
+  // (los que tienen índice mayor al máximo actual)
+  if(rows.length>0){
+    // Desactivar ítems con orden >= cantidad actual (sobran del pasado)
     await sb.from('catalogo')
       .update({activo:false,updated_at:new Date().toISOString()})
       .eq('rubro',rubro)
-      .not('id','in','('+activeIds.map(id=>"'"+id+"'").join(',')+')');
+      .gte('orden',rows.length)
+      .like('id',rubro+'_idx%');
   }
 
-  // Actualizar los IDs en memoria para que coincidan con lo guardado
+  // Sincronizar IDs en memoria
   preciosCatalog[rubro]=rows.map(r=>({id:r.id,label:r.label,unit:r.unit,precio:r.precio}));
 }
 
 async function resetRubroDefault(){
+  // Solo AGREGA los ítems del default que no existen todavía — no borra nada
   const rubro=currentPreciosTab;
-  const label={pisos:'Pisos',constructor:'Constructor',vidrios:'Vidrios',electricidad:'Electricidad',grafica:'Gráfica',equipamiento:'Mobiliario',audiovisual:'Audiovisual',otros:'Otros',indirectos:'CV-B'}[rubro]||rubro;
-  if(!confirm('¿Resetear el rubro "'+label+'" al listado por defecto? Los otros rubros no se tocan.'))return;
-  preciosCatalog[rubro]=JSON.parse(JSON.stringify(DEFAULT_CATALOG[rubro]||[]));
+  const rubroLabels={pisos:'Pisos',constructor:'Constructor',vidrios:'Vidrios',
+    electricidad:'Electricidad',grafica:'Gráfica',equipamiento:'Mobiliario',
+    audiovisual:'Audiovisual',otros:'Otros',indirectos:'CV-B'};
+  const label=rubroLabels[rubro]||rubro;
+  if(!confirm('¿Agregar los ítems por defecto al rubro "'+label+'"?\nSolo se agregan los que no existen — los tuyos no se tocan.'))return;
+
+  const existentes=preciosCatalog[rubro]||[];
+  const defaults=DEFAULT_CATALOG[rubro]||[];
+  const labelsExistentes=existentes.map(i=>i.label.toLowerCase());
+
+  // Agregar solo los que no están por label
+  const nuevos=defaults.filter(d=>!labelsExistentes.includes(d.label.toLowerCase()));
+  if(nuevos.length===0){
+    toast('Todos los ítems por defecto ya están en el rubro','success');
+    return;
+  }
+  preciosCatalog[rubro]=[...existentes,...nuevos];
   await saveRubro(rubro);
   renderPreciosTab(rubro);
-  toast('✓ Rubro "'+label+'" reseteado','success');
+  toast('✓ '+nuevos.length+' ítems agregados al rubro "'+label+'"','success');
 }
 
 async function migrarCatalogoSiNecesario(){
