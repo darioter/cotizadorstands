@@ -171,6 +171,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
 .mb-10{margin-bottom:10px}.mb-12{margin-bottom:12px}.mb-14{margin-bottom:14px}
 .mt-10{margin-top:10px}.mt-12{margin-top:12px}
 hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+
+@media print{
+  header,#bottom-nav,.summary-bar,.tabs,.no-print,
+  #step-calcular,#step-resultado,.card-header small,
+  #res-precio,#res-rubros,#res-propuestas,#res-oferta{display:none!important}
+  .print-target{display:block!important}
+  body,main{padding:0!important;margin:0!important;background:#fff!important;max-width:100%!important}
+  .oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:16px 20px!important;max-width:100%!important;margin:0!important}
+}
 small{font-size:10px;color:#999}
 
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--navy);color:#fff;border-radius:20px;padding:9px 20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap}
@@ -2079,16 +2088,8 @@ function renderOferta(res,c,m2,monSym,fmtM){
   var D2='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
 
   var html=''
-    +'<style>'
-    +'@media print{'
-    +'.no-print{display:none!important}'
-    +'#res-oferta,main{padding:0!important;margin:0!important}'
-    +'.oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:20px 28px!important;max-width:100%!important}'
-    +'header,#bottom-nav,.tabs{display:none!important}'
-    +'}'
-    +'</style>'
     +'<div class="no-print" style="margin-bottom:12px">'
-    +'<button class="btn btn-navy" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>'
+    +'<button class="btn btn-navy" onclick="printOferta()">🖨 Imprimir / Guardar PDF</button>'
     +'</div>'
     +'<div class="oferta-doc" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:28px 32px;max-width:760px;margin:0 auto;font-family:Arial,sans-serif;box-shadow:0 2px 20px rgba(0,0,0,.08)">'
 
@@ -2573,6 +2574,88 @@ function renderMonedaBox(mon,c,monSym){
     +'<div><div style="color:#888;font-size:10px">Precio neto en '+mon.moneda+'</div><div style="font-weight:700;font-size:17px;color:var(--gold)">'+monSym+' '+fmt(c.precioNeto/mon.tcFinal)+'</div></div>'
     +'<div><div style="color:#888;font-size:10px">Total + IVA en '+mon.moneda+'</div><div style="font-weight:700;font-size:17px">'+monSym+' '+fmt(c.precioTotal/mon.tcFinal)+'</div></div>'
     +'</div></div>';
+}
+
+// ── PRINT ──
+function printActiveTab(){
+  // Encontrar el tab activo
+  const activeTab=document.querySelector('#res-tabs .tab.active');
+  if(!activeTab)return window.print();
+  const tabId=activeTab.getAttribute('onclick').match(/'([^']+)'/)?.[1];
+  if(tabId==='oferta'){printOferta();return;}
+
+  // Para otros tabs: mostrar solo el div activo
+  const allDivs=['res-precio','res-rubros','res-propuestas','res-oferta'];
+  const targetId='res-'+tabId;
+
+  // Marcar el div activo para impresión
+  allDivs.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){
+      if(id===targetId){el.classList.add('print-target');}
+      else{el.classList.add('print-hide');}
+    }
+  });
+
+  // Ocultar summary bar y tabs durante impresión
+  const toHide=[
+    document.querySelector('.summary-bar'),
+    document.getElementById('res-tabs'),
+    document.querySelector('#pip-result > div:first-child'), // botones top
+  ].filter(Boolean);
+  toHide.forEach(el=>el.classList.add('print-hide'));
+
+  // CSS temporal
+  const style=document.createElement('style');
+  style.id='print-temp-style';
+  style.textContent=`
+    @media print{
+      .print-hide{display:none!important}
+      .print-target{display:block!important}
+      header,#bottom-nav,.no-print{display:none!important}
+      body,main{padding:0!important;margin:0!important;background:#fff!important;max-width:100%!important}
+    }
+  `;
+  document.head.appendChild(style);
+
+  window.print();
+
+  // Limpiar después de imprimir
+  setTimeout(()=>{
+    allDivs.forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.classList.remove('print-target','print-hide');}
+    });
+    toHide.forEach(el=>el.classList.remove('print-hide'));
+    const s=document.getElementById('print-temp-style');
+    if(s)s.remove();
+  },1000);
+}
+
+function printOferta(){
+  // Solo imprimir el documento de oferta
+  const ofertaEl=document.getElementById('res-oferta');
+  if(!ofertaEl)return;
+
+  const style=document.createElement('style');
+  style.id='print-temp-style';
+  style.textContent=`
+    @media print{
+      body > *:not(#app){display:none!important}
+      header,#bottom-nav{display:none!important}
+      main > *{display:none!important}
+      #view-pip{display:block!important}
+      #pip-result{display:block!important}
+      #pip-result > *{display:none!important}
+      #res-oferta{display:block!important}
+      .no-print{display:none!important}
+      .oferta-doc{box-shadow:none!important;border:none!important;border-radius:0!important;padding:16px 20px!important;max-width:100%!important;margin:0!important}
+      body,main{padding:0!important;margin:0!important;background:#fff!important;max-width:100%!important}
+    }
+  `;
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(()=>{const s=document.getElementById('print-temp-style');if(s)s.remove();},1000);
 }
 
 // ── UTILS ──
