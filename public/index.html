@@ -900,24 +900,25 @@ function renderParamsForm(){
 // ── CATÁLOGO: lectura/escritura por rubro en tabla dedicada ──
 
 async function loadCatalog(){
-  // Inicializar con defaults (fallback si Supabase falla)
+  // Inicializar con defaults
   preciosCatalog={};
   Object.keys(DEFAULT_CATALOG).forEach(k=>{
     preciosCatalog[k]=JSON.parse(JSON.stringify(DEFAULT_CATALOG[k]));
   });
 
   try{
-    const{data,error}=await sb.from('catalogo')
+    const resp=await sb.from('catalogo')
       .select('id,rubro,label,unit,precio,orden')
       .eq('activo',true)
       .order('rubro').order('orden');
 
-    if(error) throw error;
+    console.log('[loadCatalog] Supabase response:', resp.data?.length, 'filas, error:', resp.error?.message||'ninguno');
 
-    if(data&&data.length>0){
-      // Agrupar por rubro — cada rubro con datos en Supabase REEMPLAZA el default
+    if(resp.error) throw resp.error;
+
+    if(resp.data&&resp.data.length>0){
       const byRubro={};
-      data.forEach(row=>{
+      resp.data.forEach(row=>{
         if(!byRubro[row.rubro])byRubro[row.rubro]=[];
         byRubro[row.rubro].push({
           id:row.id,
@@ -926,18 +927,24 @@ async function loadCatalog(){
           precio:parseFloat(row.precio)||0
         });
       });
-      Object.keys(byRubro).forEach(rubro=>{
-        preciosCatalog[rubro]=byRubro[rubro];
+
+      // Log de lo que trajo por rubro
+      Object.keys(byRubro).forEach(r=>{
+        console.log('[loadCatalog]',r+':',byRubro[r].length,'items. Primer precio:',byRubro[r][0]?.precio);
+        preciosCatalog[r]=byRubro[r];
       });
+    } else {
+      console.warn('[loadCatalog] Supabase devolvió 0 filas — usando DEFAULT_CATALOG');
     }
   }catch(e){
-    console.warn('Error cargando catálogo de Supabase, usando defaults:',e.message);
+    console.error('[loadCatalog] Error:', e.message, '— usando DEFAULT_CATALOG');
   }
 
-  // Asegurar que todas las secciones existan (aunque sea vacías)
   Object.keys(DEFAULT_CATALOG).forEach(k=>{
     if(!preciosCatalog[k])preciosCatalog[k]=[];
   });
+
+  console.log('[loadCatalog] FINAL pisos[0]:', preciosCatalog.pisos?.[0]);
 }
 
 async function savePrecios(){
