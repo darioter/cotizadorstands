@@ -2046,6 +2046,13 @@ function renderPIPResult(res){
 function mbox(label,val,color){return `<div class="metric-box" style="border-left-color:${color}"><div class="metric-label">${label}</div><div class="metric-val" style="color:${color}">${val}</div></div>`;}
 function pct(n){return((n||0)*100).toFixed(1)+'%';}
 
+function dataRow2(H,D,l1,v1,l2,v2){
+  // Fila con dos campos: label arriba en gris, valor debajo
+  var c1='<td style="'+H+';width:25%">'+l1+'</td><td style="'+D+';width:25%">'+v1+'</td>';
+  var c2=l2?('<td style="'+H+';width:25%">'+l2+'</td><td style="'+D+'">'+v2+'</td>'):'<td colspan="2"></td>';
+  return '<tr>'+c1+c2+'</tr>';
+}
+
 function renderOferta(res,c,m2,monSym,fmtM){
   var r=res;
   var moneda=r.moneda||{moneda:'ARS',tcFinal:1,mgCambio:0.02};
@@ -2125,36 +2132,29 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +'</tr></table>'
     +'<hr style="border:none;border-top:2px solid #333;margin-bottom:14px" />'
 
-    // Tabla datos proyecto — responsive
-    // Tabla datos — dos bloques lado a lado
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-
-    // Bloque izquierdo: datos del proyecto
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
-    +'<tr><td style="'+H2+';width:40%">PROYECTO N°</td><td style="'+D2+'">'+escHtml(r.nro||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">MODALIDAD</td><td style="'+D2+'">'+escHtml(r.modalidad||'ALQUILER')+'</td></tr>'
-    +'<tr><td style="'+H2+'">CLIENTE</td><td style="'+D2+'">'+escHtml(r.cliente||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">EVENTO</td><td style="'+D2+'">'+escHtml(r.evento||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">LUGAR</td><td style="'+D2+'">'+escHtml(r.lugar||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">PREDIO/PAB.</td><td style="'+D2+'">'+escHtml(r.predio||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">TIPOLOGÍA</td><td style="'+D2+'">'+escHtml(r.tipo||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">APE. FERIA</td><td style="'+D2+'">'+escHtml(r.fechaApertura||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">CIERRE FERIA</td><td style="'+D2+'">'+escHtml(r.fechaCierre||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">INI. MONTAJE</td><td style="'+D2+'">'+escHtml(r.fechaMontaje||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">DESMONTAJE</td><td style="'+D2+'">'+escHtml(r.fechaDesmontaje||'—')+'</td></tr>'
+    // Tabla datos proyecto — layout vertical tipo ficha
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">'
+    // Cada campo: etiqueta arriba en gris, valor abajo en blanco
+    +dataRow2(H2,D2,'PROYECTO N°',escHtml(r.nro||'—'),'MODALIDAD',escHtml(r.modalidad||'ALQUILER'))
+    +dataRow2(H2,D2,'CLIENTE',escHtml(r.cliente||'—'),'','')
+    +dataRow2(H2,D2,'FERIA / EVENTO',escHtml(r.evento||'—'),'LUGAR',escHtml(r.lugar||'—'))
+    +dataRow2(H2,D2,'PREDIO / PABELLÓN',escHtml(r.predio||'—'),'TIPOLOGÍA',escHtml(r.tipo||'—'))
+    +dataRow2(H2,D2,'APERTURA FERIA',escHtml(r.fechaApertura||'—'),'CIERRE FERIA',escHtml(r.fechaCierre||'—'))
+    +dataRow2(H2,D2,'INICIO MONTAJE',escHtml(r.fechaMontaje||'—'),'DESMONTAJE',escHtml(r.fechaDesmontaje||'—'))
+    +'<tr>'
+    +'<td colspan="4" style="padding:0">'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<tr>'
+    +'<td style="'+H2+';width:16%">N° LOTE</td><td style="'+D2+';width:14%">'+escHtml(r.loteNro||'—')+'</td>'
+    +'<td style="'+H2+';width:14%">FRENTE</td><td style="'+D2+';width:10%">'+escHtml(r.frente||'—')+' m</td>'
+    +'<td style="'+H2+';width:12%">FONDO</td><td style="'+D2+';width:10%">'+escHtml(r.fondo||'—')+' m</td>'
+    +'<td style="'+H2+';width:14%">PISO M²</td><td style="'+D2+';width:8%">'+escHtml(r.m2||'0')+'</td>'
+    +'<td style="'+H2+';width:16%">ENTREPISO M²</td><td style="'+D2+'">'+escHtml(r.entrepiso||'0')+'</td>'
+    +'</tr>'
     +'</table>'
-
-    // Bloque derecho: datos del lote/stand
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px;align-self:start">'
-    +'<tr><td colspan="2" style="'+H2+';text-align:center;letter-spacing:.05em">STAND / LOTE</td></tr>'
-    +'<tr><td style="'+H2+';width:55%">N° LOTE</td><td style="'+D2+'">'+escHtml(r.loteNro||'—')+'</td></tr>'
-    +'<tr><td style="'+H2+'">FRENTE</td><td style="'+D2+'">'+escHtml(r.frente||'—')+' m</td></tr>'
-    +'<tr><td style="'+H2+'">FONDO</td><td style="'+D2+'">'+escHtml(r.fondo||'—')+' m</td></tr>'
-    +'<tr><td style="'+H2+'">PISO (M²)</td><td style="'+D2+'">'+escHtml(r.m2||'0')+'</td></tr>'
-    +'<tr><td style="'+H2+'">ENTREPISO (M²)</td><td style="'+D2+'">'+escHtml(r.entrepiso||'0')+'</td></tr>'
-    +'<tr><td style="'+H2+';font-weight:800">TOTAL (M²)</td><td style="'+D2+';font-weight:800">'+(parseFloat(r.m2||0)+parseFloat(r.entrepiso||0))+'</td></tr>'
+    +'</td>'
+    +'</tr>'
     +'</table>'
-    +'</div>'
 
         // Detalle descriptivo por rubro
     +(detalleRows?
@@ -2164,13 +2164,13 @@ function renderOferta(res,c,m2,monSym,fmtM){
       +'</table>'
     :'')
 
-    // Imagen render si fue cargada
+    // Render: div dinámico que se actualiza cuando se carga la imagen
+    +'<div id="oferta-render-container" style="margin-bottom:14px">'
     +(_ofertaRender
-      ?'<div style="margin-bottom:16px">'
-       +'<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Render de propuesta</div>'
-       +'<img src="'+_ofertaRender+'" style="width:100%;max-height:320px;object-fit:contain;border:1px solid #ddd;border-radius:6px" />'
-       +'</div>'
+      ?'<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Render de propuesta</div>'
+       +'<img src="'+_ofertaRender+'" style="width:100%;max-height:380px;object-fit:contain;border:1px solid #ddd;border-radius:6px" />'
       :'')
+    +'</div>'
 
     // Precio — solo totales, sin desglose
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">'
@@ -2209,10 +2209,6 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +'</div>';
   return html;
 }
-
-var H='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
-var D='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
-
 
 var H='padding:5px 8px;font-weight:700;background:#f0f0f0;border:1px solid #ccc;font-size:11px;vertical-align:middle';
 var D='padding:5px 8px;border:1px solid #ccc;font-size:11px;vertical-align:middle';
@@ -2653,11 +2649,18 @@ function loadOfertaRender(input){
   const reader=new FileReader();
   reader.onload=function(e){
     _ofertaRender=e.target.result;
+    // Actualizar nombre y botón quitar
     const nameEl=document.getElementById('oferta-render-name');
     const clearEl=document.getElementById('oferta-render-clear');
     if(nameEl)nameEl.textContent=file.name;
     if(clearEl)clearEl.style.display='inline';
-    toast('✓ Render cargado — se incluirá en la oferta','success');
+    // Actualizar el div de render en el documento si ya está visible
+    const container=document.getElementById('oferta-render-container');
+    if(container){
+      container.innerHTML='<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">Render de propuesta</div>'
+        +'<img src="'+_ofertaRender+'" style="width:100%;max-height:380px;object-fit:contain;border:1px solid #ddd;border-radius:6px" />';
+    }
+    toast('✓ Render cargado','success');
   };
   reader.readAsDataURL(file);
 }
@@ -2667,6 +2670,8 @@ function clearOfertaRender(){
   const clearEl=document.getElementById('oferta-render-clear');
   if(nameEl)nameEl.textContent='';
   if(clearEl)clearEl.style.display='none';
+  const container=document.getElementById('oferta-render-container');
+  if(container)container.innerHTML='';
   toast('Render eliminado');
 }
 
