@@ -2197,19 +2197,8 @@ function renderOferta(res,c,m2,monSym,fmtM){
     +dataRow2(H2,D2,'PREDIO / PABELLÓN',escHtml(r.predio||'—'),'TIPOLOGÍA',escHtml(r.tipo||'—'))
     +dataRow2(H2,D2,'APERTURA FERIA',escHtml(r.fechaApertura||'—'),'CIERRE FERIA',escHtml(r.fechaCierre||'—'))
     +dataRow2(H2,D2,'INICIO MONTAJE',escHtml(r.fechaMontaje||'—'),'DESMONTAJE',escHtml(r.fechaDesmontaje||'—'))
-    +'<tr>'
-    +'<td colspan="4" style="padding:0">'
-    +'<table style="width:100%;border-collapse:collapse">'
-    +'<tr>'
-    +'<td style="'+H2+';width:16%">N° LOTE</td><td style="'+D2+';width:14%">'+escHtml(r.loteNro||'—')+'</td>'
-    +'<td style="'+H2+';width:14%">FRENTE</td><td style="'+D2+';width:10%">'+escHtml(r.frente||'—')+' m</td>'
-    +'<td style="'+H2+';width:12%">FONDO</td><td style="'+D2+';width:10%">'+escHtml(r.fondo||'—')+' m</td>'
-    +'<td style="'+H2+';width:14%">PISO M²</td><td style="'+D2+';width:8%">'+escHtml(r.m2||'0')+'</td>'
-    +'<td style="'+H2+';width:16%">ENTREPISO M²</td><td style="'+D2+'">'+escHtml(r.entrepiso||'0')+'</td>'
-    +'</tr>'
-    +'</table>'
-    +'</td>'
-    +'</tr>'
+    +dataRow2(H2,D2,'N° LOTE',escHtml(r.loteNro||'—'),'FRENTE / FONDO',escHtml(r.frente||'—')+' m × '+escHtml(r.fondo||'—')+' m')
+    +dataRow2(H2,D2,'PISO (M²)',escHtml(r.m2||'0'),'ENTREPISO (M²)',escHtml(r.entrepiso||'0'))
     +'</table>'
 
         // Detalle descriptivo por rubro
