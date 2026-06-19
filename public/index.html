@@ -192,12 +192,50 @@ small{font-size:10px;color:#999}
   .user-name{display:none}
   .header-nav{display:none}
   #bottom-nav{display:block}
-  main{padding:14px 12px 80px}
+  main{padding:14px 10px 80px}
   .grid-2{grid-template-columns:1fr}
   .grid-3{grid-template-columns:1fr 1fr}
   #toast{bottom:90px}
-  .summary-stats{gap:10px}
-  .stat-value{font-size:14px}
+  .summary-stats{gap:8px}
+  .stat-value{font-size:13px}
+  .stat-label{font-size:9px}
+
+  /* Tablas — no se cortan, hacen scroll horizontal */
+  .oferta-doc{padding:12px!important;overflow-x:auto!important}
+  .oferta-doc table{min-width:320px}
+  table{border-collapse:collapse;box-sizing:border-box}
+
+  /* Tabs de resultado — scroll sin cortar */
+  #res-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  #res-tabs .tab{white-space:nowrap;flex-shrink:0;padding:8px 10px;font-size:11px}
+
+  /* Tabs de precios */
+  #view-precios .tab{white-space:nowrap;flex-shrink:0;padding:7px 9px;font-size:10px}
+
+  /* Summary bar — apilar en mobile */
+  .summary-bar .flex-between{flex-direction:column;gap:8px;align-items:flex-start}
+  .summary-stats{flex-wrap:wrap;gap:8px}
+
+  /* Cascada de precios — una columna */
+  .res-waterfall .flex-between{flex-direction:row;font-size:12px}
+
+  /* Metric grid — 2 columnas en mobile está bien */
+  .metric-grid{grid-template-columns:1fr 1fr;gap:6px}
+
+  /* Cards de propuesta */
+  .proposal-card .feature-grid{grid-template-columns:1fr}
+  .palette-dot{width:28px!important;height:28px!important}
+
+  /* Formulario PIP — campos más cómodos */
+  input,select,textarea{font-size:16px!important} /* evita zoom en iOS */
+  .pip-num{width:56px!important}
+
+  /* Botones de acción no se comprimen */
+  .btn{white-space:nowrap}
+  .card-header{flex-wrap:wrap;gap:8px}
+
+  /* Print buttons dentro de tabs */
+  .no-print .btn{font-size:11px;padding:7px 12px}
 }
 @media(min-width:601px){
   .user-name{display:block}
